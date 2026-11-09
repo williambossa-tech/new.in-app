@@ -1,0 +1,145 @@
+@import "tailwindcss";
+@import "@fontsource/lato/400.css";
+@import "@fontsource/lato/700.css";
+@import "@fontsource/lato/900.css";
+
+/* Paleta oficial da Corujinha (proposta TV do elevador) */
+@theme {
+  --color-violeta: #6c5ce7;
+  --color-violeta-700: #5546d1;
+  --color-violeta-900: #3d2fa8;
+  --color-violeta-50: #f3f1ff;
+  --color-violeta-100: #e6e2ff;
+  --color-turquesa: #17b5a6;
+  --color-turquesa-50: #e5f8f6;
+  --color-amarelo: #ffc83d;
+  --color-amarelo-50: #fff7e0;
+  --color-coral: #ff6b5b;
+  --color-coral-50: #fff0ee;
+  --color-verde: #4cc26b;
+  --color-verde-50: #e9f8ee;
+  --color-noite: #1d2b4f;
+  --color-noite-70: #4a5675;
+  --color-noite-50: #7a8399;
+  --color-fundo: #f6f5fe;
+  --color-linha: #e7e5f4;
+  --font-sans: "Lato", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --radius-card: 20px;
+  --shadow-card: 0 1px 2px rgba(29, 43, 79, 0.05), 0 10px 30px -12px rgba(29, 43, 79, 0.14);
+}
+
+html {
+  font-size: 17px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-fundo);
+  color: var(--color-noite);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@utility btn {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 text-base font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violeta/30 disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-violeta text-white hover:bg-violeta-700 active:bg-violeta-900;
+}
+@utility btn-secondary {
+  @apply btn bg-violeta-50 text-violeta-700 ring-1 ring-violeta-100 hover:bg-violeta-100;
+}
+@utility btn-ghost {
+  @apply btn bg-transparent text-violeta-700 hover:bg-violeta-50;
+}
+@utility btn-danger {
+  @apply btn bg-coral text-white hover:brightness-95;
+}
+@utility btn-success {
+  @apply btn bg-turquesa text-white hover:brightness-95;
+}
+@utility btn-sm {
+  @apply min-h-10 px-4 text-sm;
+}
+@utility badge {
+  @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide;
+}
+@utility badge-violeta {
+  @apply badge bg-violeta-50 text-violeta-700;
+}
+@utility badge-turquesa {
+  @apply badge bg-turquesa-50 text-[#0e7f74];
+}
+@utility badge-amarelo {
+  @apply badge bg-amarelo-50 text-[#8a6100];
+}
+@utility badge-coral {
+  @apply badge bg-coral-50 text-[#c23a2b];
+}
+@utility badge-verde {
+  @apply badge bg-verde-50 text-[#23803e];
+}
+@utility badge-cinza {
+  @apply badge bg-[#eef0f5] text-noite-70;
+}
+
+@layer components {
+  .card {
+    @apply rounded-[var(--radius-card)] bg-white shadow-[var(--shadow-card)] ring-1 ring-linha/60;
+  }
+
+  .field-label { @apply mb-1.5 block text-[0.95rem] font-bold text-noite; }
+  .field-hint { @apply mt-1 text-sm text-noite-50; }
+  .input {
+    @apply block w-full min-h-12 rounded-2xl border border-linha bg-white px-4 text-base text-noite placeholder:text-noite-50/70
+      focus:border-violeta focus:outline-none focus:ring-4 focus:ring-violeta/15;
+  }
+  textarea.input { @apply py-3; }
+
+
+  .eyebrow { @apply text-xs font-black uppercase tracking-[0.14em] text-violeta; }
+  .h1 { @apply text-[1.75rem] leading-tight font-black tracking-tight sm:text-[2.1rem]; }
+  .h2 { @apply text-xl font-black tracking-tight; }
+  .muted { @apply text-noite-70; }
+  .mono { @apply font-mono text-[0.82rem] break-all; }
+
+  .table-wrap { @apply -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0; }
+  .tbl { @apply w-full border-separate border-spacing-0 text-sm; }
+  .tbl th { @apply border-b border-linha px-3 py-2 text-left text-xs font-black uppercase tracking-wide text-noite-50; }
+  .tbl td { @apply border-b border-linha/70 px-3 py-2.5 align-top; }
+
+  .prose-newin p { @apply my-2; }
+  .prose-newin ul { @apply my-2 list-disc space-y-1.5 pl-5; }
+  .prose-newin ol { @apply my-2 list-decimal space-y-1.5 pl-5; }
+  .prose-newin strong { @apply font-black; }
+  .prose-newin em { @apply text-noite-50 not-italic text-[0.9em]; }
+}
+
+@keyframes owl-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(-2deg); }
+}
+.owl-bob { animation: owl-bob 3.2s ease-in-out infinite; }
+
+@keyframes pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.pop-in { animation: pop-in 0.6s cubic-bezier(.2,.9,.3,1.3) both; }
+
+@keyframes shuffle-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+.shuffle-blink { animation: shuffle-blink .25s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .owl-bob, .pop-in, .shuffle-blink { animation: none; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+}
