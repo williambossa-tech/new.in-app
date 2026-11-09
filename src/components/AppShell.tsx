@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { SessionUser } from "@/lib/auth";
 import { currentEnv } from "@/lib/db";
+import { FloatingOwl } from "./FloatingOwl";
 import { BottomNav, TopNav, type NavItem } from "./NavLinks";
 
 export async function EnvBanner() {
@@ -62,6 +63,7 @@ export async function AppShell({ user, children, wide = false }: { user: Session
         </div>
       </header>
       <main className={`mx-auto px-5 py-8 sm:py-12 ${wide ? "max-w-6xl" : "max-w-4xl"}`}>{children}</main>
+      <FloatingOwl />
       <BottomNav items={items} />
     </div>
   );

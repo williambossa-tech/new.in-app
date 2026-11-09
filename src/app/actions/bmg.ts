@@ -130,9 +130,19 @@ export async function taxaAction(_: ActionState, f: FormData): Promise<ActionSta
       module: String(f.get("module") ?? "bmg"), component: String(f.get("component")),
       amount: Number(String(f.get("amount") ?? "").replace(/\./g, "").replace(",", ".")),
       basis: String(f.get("basis")), validFrom: String(f.get("valid_from") ?? ""), source: String(f.get("source") ?? ""),
+      id: String(f.get("id") ?? "") || undefined,
     });
     refresh();
     revalidatePath("/admin/parametros");
-    return { ok: true, message: "Valor cadastrado. Vale para reservas feitas a partir de agora com entrada na vigência." };
+    return { ok: true, message: "Valor salvo. Reservas já feitas mantêm os valores da contratação." };
+  } catch (e) { return { message: errMsg(e) }; }
+}
+
+export async function excluirTaxaAction(_: ActionState, f: FormData): Promise<ActionState> {
+  const me = await requireRole("admin");
+  try {
+    await bmg.deleteFee({ id: me.id, label: me.fullName }, String(f.get("id")), String(f.get("reason") ?? ""));
+    refresh();
+    return { ok: true, message: "Valor excluído." };
   } catch (e) { return { message: errMsg(e) }; }
 }

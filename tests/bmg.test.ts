@@ -34,7 +34,7 @@ describe("Be My Guest", () => {
   it("taxas: valores com vigência ficam congelados na reserva", async () => {
     await bmg.addFee(A(), { module: "bmg", component: "taxa_uso", amount: 80, basis: "por_diaria", validFrom: "2026-01-01", source: "AGE teste" });
     await bmg.addFee(A(), { module: "bmg", component: "taxa_limpeza", amount: 60, basis: "por_reserva", validFrom: "2026-01-01", source: "AGE teste" });
-    await expect(db()`update fee_schedules set amount = 1`).rejects.toThrow(/nova data de vigência/);
+    // corrigir um valor cadastrado não altera reservas já feitas (testado abaixo)
   });
 
   it("fechado para moradores quando a administração fecha; reabre com antecedência definida", async () => {

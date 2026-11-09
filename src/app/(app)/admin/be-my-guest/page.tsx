@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  ausenciaBmgAction, configBmgAction, taxaAction, decidirBmgAction, entradaBmgAction, excecaoBmgAction, ocorrenciaBmgAction, saidaBmgAction,
+  ausenciaBmgAction, configBmgAction, excluirTaxaAction, taxaAction, decidirBmgAction, entradaBmgAction, excecaoBmgAction, ocorrenciaBmgAction, saidaBmgAction,
 } from "@/app/actions/bmg";
 import { AdminTabs } from "@/components/AppShell";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -29,7 +29,7 @@ export default async function AdminBmg({ searchParams }: { searchParams: Promise
   const data = await bmgAdminData(me.id, { from, to, room: sp.quarto, status: sp.situacao });
   const { settings, fees } = await asUser(me.id, async (tx) => ({
     settings: await bmgSettings(tx),
-    fees: await tx`select component, amount, basis, valid_from, source from fee_schedules where module = 'bmg' order by component, valid_from desc`,
+    fees: await tx`select id, component, amount, basis, valid_from, source from fee_schedules where module = 'bmg' order by component, valid_from desc`,
   }));
   const tabs = admin
     ? [["agenda", "Agenda"], ["solicitacoes", `Solicitações${data.pending.length ? ` (${data.pending.length})` : ""}`], ["hoje", "Entradas e saídas"],
@@ -83,22 +83,42 @@ export default async function AdminBmg({ searchParams }: { searchParams: Promise
           <section className="card p-7">
             <h2 className="h2">Taxas (Regimento 27.17)</h2>
             <p className="mt-1 text-sm text-noite-50">Cada reserva guarda os valores vigentes no momento da contratação. Para mudar um valor, cadastre um novo com nova vigência.</p>
-            <table className="tbl mt-4">
-              <thead><tr><th>Componente</th><th>Valor</th><th>Base</th><th>Vigência</th></tr></thead>
-              <tbody>
-                {["taxa_uso", "taxa_limpeza", "fundo_manutencao"].map((c) => {
-                  const cur = fees.filter((x) => x.component === c);
-                  const label = { taxa_uso: "Taxa de uso", taxa_limpeza: "Taxa de limpeza", fundo_manutencao: "Fundo de manutenção" }[c];
-                  return cur.length ? cur.map((x, i) => (
-                    <tr key={c + i} className={i ? "text-noite-50" : ""}><td>{i ? "" : label}</td>
-                      <td>{Number(x.amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
-                      <td>{x.basis === "por_diaria" ? "por diária" : "por reserva"}</td>
-                      <td title={x.source}>desde {new Date(x.valid_from).toISOString().slice(0, 10).split("-").reverse().join("/")}</td></tr>
-                  )) : <tr key={c}><td>{label}</td><td colSpan={3}><span className="badge-amarelo">Pendente de assembleia</span></td></tr>;
-                })}
-              </tbody>
-            </table>
-            <ActionForm action={taxaAction} className="mt-5 grid gap-3 sm:grid-cols-2" resetOnSuccess>
+            <div className="mt-4 divide-y divide-linha">
+              {["taxa_uso", "taxa_limpeza", "fundo_manutencao"].map((c) => {
+                const cur = fees.filter((x) => x.component === c);
+                const label = { taxa_uso: "Taxa de uso", taxa_limpeza: "Taxa de limpeza", fundo_manutencao: "Fundo de manutenção" }[c];
+                if (!cur.length) return (
+                  <div key={c} className="flex items-center justify-between py-3"><span className="font-medium">{label}</span><span className="badge-amarelo">Pendente de assembleia</span></div>
+                );
+                return cur.map((x, i) => {
+                  const iso = new Date(x.valid_from).toISOString().slice(0, 10);
+                  return (
+                    <details key={x.id} className="py-3">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                        <span className={i ? "text-noite-50" : "font-medium"}>{i ? "↳ anterior" : label}</span>
+                        <span className="text-sm">{Number(x.amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} {x.basis === "por_diaria" ? "por diária" : "por reserva"}
+                          <span className="text-noite-50"> · desde {iso.split("-").reverse().join("/")}</span> <span className="ml-1 text-violeta-700">Editar</span></span>
+                      </summary>
+                      <ActionForm action={taxaAction} className="mt-3 grid gap-2 rounded-2xl bg-fundo p-4 sm:grid-cols-2">
+                        <input type="hidden" name="module" value="bmg" /><input type="hidden" name="id" value={x.id} /><input type="hidden" name="component" value={x.component} />
+                        <input className="input" name="amount" inputMode="decimal" defaultValue={String(x.amount).replace(".", ",")} required />
+                        <select className="input" name="basis" defaultValue={x.basis}><option value="por_diaria">por diária</option><option value="por_reserva">por reserva</option></select>
+                        <input className="input" name="valid_from" type="date" defaultValue={iso} required />
+                        <input className="input" name="source" defaultValue={x.source} required />
+                        <div><SubmitButton className="btn-secondary btn-sm">Salvar alteração</SubmitButton></div>
+                      </ActionForm>
+                      <ActionForm action={excluirTaxaAction} className="mt-2 flex gap-2">
+                        <input type="hidden" name="id" value={x.id} />
+                        <input className="input min-h-10 flex-1" name="reason" placeholder="Motivo para excluir este valor" required />
+                        <SubmitButton className="btn-ghost btn-sm text-[#c23a2b]" confirm="Excluir este valor da tabela?">Excluir</SubmitButton>
+                      </ActionForm>
+                    </details>
+                  );
+                });
+              })}
+            </div>
+            <p className="mt-4 text-sm font-medium">Cadastrar novo valor</p>
+            <ActionForm action={taxaAction} className="mt-2 grid gap-3 sm:grid-cols-2" resetOnSuccess>
               <input type="hidden" name="module" value="bmg" />
               <select className="input" name="component" required><option value="taxa_uso">Taxa de uso</option><option value="taxa_limpeza">Taxa de limpeza</option><option value="fundo_manutencao">Fundo de manutenção</option></select>
               <input className="input" name="amount" inputMode="decimal" placeholder="Valor (R$)" required />

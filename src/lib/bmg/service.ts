@@ -268,16 +268,38 @@ function overlaps(rg: { lo: number; hi: number }, a: number, b: number) {
   return rg.lo < b && rg.hi > a;
 }
 
-export async function addFee(actor: Actor, input: { module: string; component: string; amount: number; basis: string; validFrom: string; source: string }) {
+export async function addFee(actor: Actor, input: { module: string; component: string; amount: number; basis: string; validFrom: string; source: string; id?: string }) {
   return asSystem(async (tx) => {
     const role = await roleOf(tx);
     if (!role.admin) throw new RuleError("Somente a administração.");
     if (!(input.amount >= 0)) throw new RuleError("Informe um valor válido.");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.validFrom)) throw new RuleError("Informe a data de início da vigência.");
     if (input.source.trim().length < 5) throw new RuleError("Informe a deliberação que aprovou o valor (ex.: AGE de 15/11/2026).");
-    await tx`insert into fee_schedules (module, component, amount, basis, valid_from, source, created_by)
-             values (${input.module}, ${input.component}, ${input.amount}, ${input.basis}, ${input.validFrom}, ${input.source.trim()}, ${actor.id})`;
-    await audit(tx, { actorId: actor.id, actorLabel: actor.label, action: "taxa.cadastro", entity: "fee_schedule", entityId: `${input.module}.${input.component}`,
-      data: { valor: input.amount, base: input.basis, vigencia: input.validFrom, fonte: input.source.trim() } });
+    const [before] = input.id
+      ? await tx`select * from fee_schedules where id = ${input.id}`
+      : await tx`select * from fee_schedules where module = ${input.module} and component = ${input.component} and valid_from = ${input.validFrom}`;
+    if (before) {
+      await tx`update fee_schedules set component = ${input.component}, amount = ${input.amount}, basis = ${input.basis},
+               valid_from = ${input.validFrom}, source = ${input.source.trim()} where id = ${before.id}`;
+    } else {
+      await tx`insert into fee_schedules (module, component, amount, basis, valid_from, source, created_by)
+               values (${input.module}, ${input.component}, ${input.amount}, ${input.basis}, ${input.validFrom}, ${input.source.trim()}, ${actor.id})`;
+    }
+    await audit(tx, { actorId: actor.id, actorLabel: actor.label, action: before ? "taxa.alteracao" : "taxa.cadastro", entity: "fee_schedule",
+      entityId: `${input.module}.${input.component}`,
+      data: { antes: before ? { valor: Number(before.amount), base: before.basis, vigencia: new Date(before.valid_from).toISOString().slice(0, 10), fonte: before.source } : null,
+              depois: { valor: input.amount, base: input.basis, vigencia: input.validFrom, fonte: input.source.trim() } } });
+  }, actor.id);
+}
+
+export async function deleteFee(actor: Actor, id: string, reason: string) {
+  return asSystem(async (tx) => {
+    const role = await roleOf(tx);
+    if (!role.admin) throw new RuleError("Somente a administração.");
+    if (reason.trim().length < 5) throw new RuleError("Informe o motivo da exclusão.");
+    const [f] = await tx`delete from fee_schedules where id = ${id} returning *`;
+    if (!f) throw new RuleError("Valor não encontrado.");
+    await audit(tx, { actorId: actor.id, actorLabel: actor.label, action: "taxa.exclusao", entity: "fee_schedule", entityId: `${f.module}.${f.component}`,
+      data: { valor: Number(f.amount), base: f.basis, vigencia: new Date(f.valid_from).toISOString().slice(0, 10), fonte: f.source, motivo: reason.trim() } });
   }, actor.id);
 }
