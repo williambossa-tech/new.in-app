@@ -33,11 +33,15 @@ export async function AppShell({ user, children, wide = false }: { user: Session
             <span className="hidden text-sm font-medium text-white/70 sm:inline">Comunidade</span>
           </Link>
           <div className="flex-1"><TopNav items={items} /></div>
-          {admin && (
-            <Link href="/admin" className="rounded-full bg-amarelo px-4 py-2 text-sm font-black text-noite hover:brightness-95">
+          {admin ? (
+            <Link href="/admin" className="rounded-full bg-amarelo px-4 py-2 text-sm font-semibold text-noite hover:brightness-95">
               Administração
             </Link>
-          )}
+          ) : user.roles.includes("portaria") ? (
+            <Link href="/admin/be-my-guest" className="rounded-full bg-amarelo px-4 py-2 text-sm font-semibold text-noite hover:brightness-95">
+              Portaria
+            </Link>
+          ) : null}
           <details className="relative">
             <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full bg-white/15 px-3 py-2 text-sm font-bold hover:bg-white/25">
               <span className="grid h-7 w-7 place-items-center rounded-full bg-white text-violeta-700">{firstName[0]?.toUpperCase()}</span>
@@ -68,6 +72,7 @@ export function AdminTabs({ active }: { active: string }) {
     ["/admin", "Painel"],
     ["/admin/cadastros", "Cadastros"],
     ["/admin/sorteios/festas-2026", "Sorteio"],
+    ["/admin/be-my-guest", "Be My Guest"],
     ["/admin/parametros", "Parâmetros"],
     ["/admin/auditoria", "Auditoria"],
   ];

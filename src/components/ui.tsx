@@ -54,9 +54,9 @@ export function Empty({ pose = "descanso", title, children }: { pose?: Pose; tit
 
 export function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: React.ReactNode }) {
   return (
-    <div className="card p-4">
-      <p className="text-xs font-black uppercase tracking-wide text-noite-50">{label}</p>
-      <p className="mt-1 text-2xl font-black">{value}</p>
+    <div className="card p-5">
+      <p className="text-[0.8rem] text-noite-50">{label}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
       {hint && <p className="mt-0.5 text-sm muted">{hint}</p>}
     </div>
   );

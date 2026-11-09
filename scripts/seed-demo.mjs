@@ -16,7 +16,7 @@ try {
   const [m] = await sql`select env from environment_marker`;
   if (m?.env !== "demonstracao") { console.log("seed-demo: banco não é de demonstração; nada feito."); process.exit(0); }
   const [{ n }] = await sql`select count(*)::int as n from users where email like '%@demo.newin'`;
-  if (n > 0) { console.log("seed-demo: já populado."); process.exit(0); }
+  if (n > 0) { console.log("seed-demo: já populado."); await seedBmg(); process.exit(0); }
   const pw = await hash("demo2026");
   await sql.begin(async (tx) => {
     const mk = async (email, name, roles, unit, relation = "proprietario", resides = true) => {
@@ -52,6 +52,39 @@ try {
              values (null, 'Sistema', 'demo.popular', 'environment', 'demonstracao', ${sql.json({ aviso: "dados fictícios" })}, '', '')`;
   });
   console.log("seed-demo: ambiente de demonstração populado.");
+  await seedBmg();
 } finally {
   await sql.end();
+}
+
+// Be My Guest de demonstração: abre o módulo (antecedência fictícia) e cria algumas reservas.
+async function seedBmg() {
+  const [{ n }] = await sql`select count(*)::int as n from bookings where kind = 'bmg'`;
+  const [ab] = await sql`select status from parameters where key = 'bmg.abertura'`;
+  if (n > 0 || !ab) return;
+  const cpf = (b) => { const d = b.split("").map(Number); const dv = (a) => { const s = a.reduce((x, v, i) => x + v * (a.length + 1 - i), 0); const r = (s * 10) % 11; return r === 10 ? 0 : r; }; d.push(dv(d)); d.push(dv(d)); return d.join(""); };
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const add = (iso, k) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + k); return d.toISOString().slice(0, 10); };
+  await sql.begin(async (tx) => {
+    await tx`update parameters set status = 'definido', value = ${tx.json({ horas: 24, texto: "24 horas antes da entrada [DEMO]" })}, source = 'Valor fictício de demonstração', updated_at = now() where key = 'bmg.antecedencia'`;
+    await tx`update parameters set status = 'definido', value = ${tx.json({ ativo: true, texto: "Abertas [DEMO]" })}, source = 'Valor fictício de demonstração', updated_at = now() where key = 'bmg.abertura'`;
+    const owners = await tx`select m.user_id, m.unit_id, u.full_name from unit_memberships m join users u on u.id = m.user_id
+                            where u.email like 'morador%@demo.newin' and u.email <> 'morador@demo.newin' and m.relation in ('proprietario','locatario') and m.status = 'ativo' order by u.email limit 4`;
+    const plan = [["bmg-1", 2, 5, "confirmada"], ["bmg-2", 4, 6, "solicitada"], ["bmg-1", 9, 12, "confirmada"], ["bmg-2", 14, 16, "confirmada"]];
+    for (let i = 0; i < plan.length && i < owners.length; i++) {
+      const [room, a, b, status] = plan[i];
+      const o = owners[i];
+      const s = add(today, a), e = add(today, b);
+      const [sp] = await tx`select id from spaces where code = ${room}`;
+      const [bk] = await tx`insert into bookings (space_id, unit_id, responsible_user_id, responsible_name, kind, status, period, blocked, origin, created_by)
+        values (${sp.id}, ${o.unit_id}, ${o.user_id}, ${o.full_name}, 'bmg', ${status},
+                tstzrange((${s}::date + time '18:00') at time zone 'America/Sao_Paulo', (${e}::date + time '12:00') at time zone 'America/Sao_Paulo', '[)'),
+                tstzrange((${s}::date + time '18:00') at time zone 'America/Sao_Paulo', (${e}::date + time '18:00') at time zone 'America/Sao_Paulo', '[)'),
+                'app', ${o.user_id}) returning id`;
+      await tx`insert into bmg_details (booking_id, start_date, end_date, requested_by, terms_version, terms_accepted_at) values (${bk.id}, ${s}, ${e}, ${o.user_id}, 1, now())`;
+      await tx`insert into bmg_guests (booking_id, full_name, cpf) values (${bk.id}, ${"Convidado Fictício " + (i + 1) + " [DEMO]"}, ${cpf(String(100000000 + i * 1111111))})`;
+      await tx`insert into bmg_operations (booking_id) values (${bk.id})`;
+    }
+  });
+  console.log("seed-demo: Be My Guest de demonstração criado.");
 }

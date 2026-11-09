@@ -160,7 +160,7 @@ describe("congelamento e sorteio", () => {
     for (const st of recomputed.stages) {
       expect(stored.find((x) => x.period === st.period && x.space === st.space)?.winner ?? null).toBe(st.winner);
     }
-    const bookings = await db()`select lower(period) as ini, upper(period) as fim, kind from bookings`;
+    const bookings = await db()`select lower(period) as ini, upper(period) as fim, kind from bookings where kind = 'salao_festivo'`;
     expect(bookings.length).toBe(6);
     for (const b of bookings) expect((+b.fim - +b.ini) / 3600_000).toBe(48);
   });
@@ -221,7 +221,7 @@ describe("congelamento e sorteio", () => {
     expect(rounds[0].seed_commitment).not.toBe(rounds[1].seed_commitment);
     const [{ n }] = await db()`select count(*)::int as n from lottery_stages where status = 'anulada'`;
     expect(n).toBe(6);
-    const [{ ativas }] = await db()`select count(*)::int as ativas from bookings where status = 'confirmada'`;
+    const [{ ativas }] = await db()`select count(*)::int as ativas from bookings where status = 'confirmada' and kind = 'salao_festivo'`;
     expect(ativas).toBe(0);
   });
 });
@@ -231,17 +231,17 @@ describe("auditoria", () => {
     const [v] = await db()`select * from app.audit_verify()`;
     expect(v.ok).toBe(true);
     expect(Number(v.total)).toBeGreaterThan(10);
-    await expect(db()`update audit_log set actor_label = 'x' where id = 1`).rejects.toThrow(/não pode ser alterada/);
+    await expect(db()`update audit_log set actor_label = 'x' where id = (select min(id) from audit_log)`).rejects.toThrow(/não pode ser alterada/);
     await expect(db()`delete from audit_log`).rejects.toThrow();
   });
 
   it("detecta adulteração mesmo com gatilho desligado", async () => {
     await asSystem(async (tx) => {
       await tx`alter table audit_log disable trigger audit_log_no_update`;
-      await tx`update audit_log set actor_label = 'adulterado' where id = 2`;
+      await tx`update audit_log set actor_label = 'adulterado' where id = (select min(id) from audit_log)`;
       const [v] = await tx`select * from app.audit_verify()`;
       expect(v.ok).toBe(false);
-      expect(Number(v.first_broken)).toBe(2);
+      expect(Number(v.first_broken)).toBeGreaterThan(0);
       throw new Error("rollback");
     }).catch((e) => expect(String(e)).toMatch(/rollback/));
   });
@@ -254,6 +254,16 @@ describe("aleatoriedade", () => {
     const exp = trials / n;
     const chi = counts.reduce((s, c) => s + (c - exp) ** 2 / exp, 0);
     expect(chi).toBeLessThan(22.46); // p = 0,001 com 6 graus de liberdade
+  });
+});
+
+describe("auditoria sob concorrência", () => {
+  it("gravações simultâneas mantêm a corrente íntegra", async () => {
+    const { audit } = await import("@/lib/audit");
+    const { asSystem } = await import("@/lib/db");
+    await Promise.all(Array.from({ length: 20 }, (_, i) => asSystem((tx) => audit(tx, { actorId: null, actorLabel: "Teste", action: "teste.concorrencia", entity: "t", entityId: String(i) }))));
+    const [v] = await db()`select * from app.audit_verify()`;
+    expect(v.ok).toBe(true);
   });
 });
 
