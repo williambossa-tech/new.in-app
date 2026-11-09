@@ -48,4 +48,6 @@ export const ACTION_LABELS: Record<string, string> = {
   "sorteio.concluir": "Sorteio concluído e chave revelada",
   "sorteio.anular": "Rodada anulada",
   "sorteio.simulacao": "Simulação executada",
+  "sorteio.desistencia": "Desistência e novo sorteio",
+  "sorteio.revelar_reserva": "Período de desistências encerrado (chave reserva revelada)",
 };

@@ -174,3 +174,24 @@ export function randomSeedHex(): string {
   globalThis.crypto.getRandomValues(b);
   return toHex(b);
 }
+
+// ---------------------------------------------------------------------------
+// Desistência: novo sorteio entre os demais inscritos da etapa
+// ---------------------------------------------------------------------------
+export const substitutionLabel = (campaign: string, round: number, period: string, space: string, n: number) =>
+  `${stageLabel(campaign, round, period, space)}|desistencia${n}`;
+
+export async function drawSubstitution(args: {
+  doc: FreezeDoc; round: number; reserveSeedHex: string; entropy: string;
+  period: string; space: string; n: number; excluded: string[];
+}) {
+  const { doc, round, reserveSeedHex, entropy, period, space, n, excluded } = args;
+  const s = doc.periodos.find((x) => x.codigo === period)?.saloes.find((x) => x.codigo === space);
+  if (!s) throw new Error("etapa inexistente no documento congelado");
+  const eligible = [...s.apartamentos].sort(byUnitCode).filter((u) => !excluded.includes(u));
+  const label = substitutionLabel(doc.campanha, round, period, space, n);
+  const eHash = await eligibleHash(label, eligible);
+  if (!eligible.length) return { label, eligible, eligibleHash: eHash, index: null, counter: null, winner: null as string | null };
+  const { index, counter } = await uniformIndex(reserveSeedHex, entropy, label, eligible.length);
+  return { label, eligible, eligibleHash: eHash, index, counter, winner: eligible[index] as string | null };
+}

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { asSystem, asUser, db } from "@/lib/db";
 import * as engine from "@/lib/lottery/engine";
-import { computeRound, freezeHash, sha256Hex, uniformIndex, type FreezeDoc } from "@/lib/lottery/core";
+import { computeRound, drawSubstitution, freezeHash, sha256Hex, uniformIndex, type FreezeDoc } from "@/lib/lottery/core";
 import { enroll, mkUser } from "./helpers";
 
 let admin: string;
@@ -50,7 +50,7 @@ describe("inscrições", () => {
   });
 
   it("proprietário não residente (unidade locada) é recusado — item 20.5", async () => {
-    await expect(enroll(users.naoResidente, "306", "natal", "skybar")).rejects.toThrow(/20.5/);
+    await expect(enroll(users.naoResidente, "306", "natal", "skybar")).rejects.toThrow(/moradores do apartamento/);
   });
 
   it("cadastro pendente não inscreve", async () => {
@@ -163,6 +163,54 @@ describe("congelamento e sorteio", () => {
     const bookings = await db()`select lower(period) as ini, upper(period) as fim, kind from bookings`;
     expect(bookings.length).toBe(6);
     for (const b of bookings) expect((+b.fim - +b.ini) / 3600_000).toBe(48);
+  });
+
+  it("desistência do sorteado gera novo sorteio automático entre os demais inscritos", async () => {
+    const stages = await db()`
+      select x.id, p.code as period, s.code as space, u.code as winner from lottery_stages x join lottery_periods p on p.id = x.period_id
+      join spaces s on s.id = x.space_id join units u on u.id = x.winner_unit_id
+      where x.status = 'sorteada' and p.code = 'natal' order by x.seq`;
+    const st = stages[0];
+    const owner = users["a" + st.winner];
+    const other = Object.entries(users).find(([k]) => k.startsWith("a") && k !== "a" + st.winner && /^a\d+$/.test(k))![1];
+    await expect(engine.withdraw({ id: other, label: "Outro" }, "festas-2026", st.id, "", "morador", st.winner)).rejects.toThrow(/Somente moradores/);
+    const r1 = await engine.withdraw({ id: owner, label: "Dono" }, "festas-2026", st.id, "", "morador", st.winner);
+    const otherWinners = stages.slice(1).map((x) => x.winner);
+    if (r1.newWinner) {
+      expect(r1.newWinner).not.toBe(st.winner);
+      expect(otherWinners).not.toContain(r1.newWinner);
+    }
+    const bk = await db()`select u.code, b.status from bookings b join units u on u.id = b.unit_id where b.lottery_stage_id = ${st.id} order by b.created_at`;
+    expect(bk[0]).toMatchObject({ code: st.winner, status: "cancelada" });
+    if (r1.newWinner) expect(bk[1]).toMatchObject({ code: r1.newWinner, status: "confirmada" });
+    // Clique duplo da administração: só um registro passa
+    if (r1.newWinner) {
+      const two = await Promise.allSettled([
+        engine.withdraw(A(), "festas-2026", st.id, "Comunicado por telefone à portaria", "administracao", r1.newWinner),
+        engine.withdraw(A(), "festas-2026", st.id, "Comunicado por telefone à portaria", "administracao", r1.newWinner),
+      ]);
+      expect(two.filter((x) => x.status === "fulfilled")).toHaveLength(1);
+    }
+    await expect(db()`update lottery_substitutions set reason = 'x'`).rejects.toThrow(/não podem ser alterados/);
+  });
+
+  it("revela a chave reserva e permite conferir os novos sorteios; depois não aceita desistências", async () => {
+    await engine.revealReserve(A(), "festas-2026");
+    const [r] = await db()`select * from lottery_rounds where round = 1`;
+    expect(await sha256Hex(r.reserve_revealed)).toBe(r.reserve_commitment);
+    const [c] = await db()`select freeze_doc from lottery_campaigns`;
+    const subs = await db()`select s.n, s.excluded, s.eligible_hash, nw.code as new_winner, p.code as period, sp.code as space
+      from lottery_substitutions s join lottery_stages x on x.id = s.stage_id join lottery_periods p on p.id = x.period_id
+      join spaces sp on sp.id = x.space_id left join units nw on nw.id = s.new_winner_unit_id`;
+    expect(subs.length).toBeGreaterThan(0);
+    for (const s of subs) {
+      const re = await drawSubstitution({ doc: c.freeze_doc as FreezeDoc, round: 1, reserveSeedHex: r.reserve_revealed, entropy: r.public_entropy,
+        period: s.period, space: s.space, n: s.n, excluded: s.excluded as string[] });
+      expect(re.winner ?? null).toBe(s.new_winner ?? null);
+      expect(re.eligibleHash).toBe(s.eligible_hash);
+    }
+    const [st] = await db()`select id, (select u.code from units u where u.id = winner_unit_id) as w from lottery_stages where status = 'sorteada' limit 1`;
+    await expect(engine.withdraw(A(), "festas-2026", st.id, "Teste após encerramento", "administracao", st.w)).rejects.toThrow(/encerrado/);
   });
 
   it("anulação exige justificativa, preserva o histórico e lacra nova chave", async () => {

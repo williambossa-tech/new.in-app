@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Identifica cada publicação: se o navegador estiver com uma versão antiga aberta,
+  // o Next recarrega a página em vez de falhar ao chamar uma ação que mudou.
+  deploymentId: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.RAILWAY_DEPLOYMENT_ID || undefined,
   serverExternalPackages: ["pdfkit", "postgres"],
   poweredByHeader: false,
   async headers() {

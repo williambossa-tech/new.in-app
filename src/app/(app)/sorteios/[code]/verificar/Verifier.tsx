@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { canonicalJson, computeRound, freezeHash, sha256Hex, type FreezeDoc } from "@/lib/lottery/core";
+import { canonicalJson, computeRound, drawSubstitution, freezeHash, sha256Hex, type FreezeDoc } from "@/lib/lottery/core";
 
 type Check = { label: string; ok: boolean | null; detail?: string };
 type Api = {
   campanha: { code: string; title: string; status: string; freeze_doc: FreezeDoc | null; freeze_hash: string | null; current_round: number };
-  rounds: { round: number; status: string; seed_commitment: string; public_entropy: string | null; seed_revealed: string | null; order_doc: Record<string, string[]> | null; annul_reason: string | null }[];
+  rounds: { round: number; status: string; seed_commitment: string; public_entropy: string | null; seed_revealed: string | null; order_doc: Record<string, string[]> | null; annul_reason: string | null; reserve_commitment: string | null; reserve_revealed: string | null }[];
+  substituicoes: { round: number; n: number; excluded: string[]; eligible_hash: string; periodo: string; salao: string; salao_nome: string; desistente: string; novo_vencedor: string | null }[];
   stages: { round: number; seq: number; status: string; periodo: string; salao: string; salao_nome: string; vencedor: string | null; eligible: string[] | null; eligible_hash: string | null; draw_index: number | null }[];
 };
 
@@ -52,6 +53,18 @@ export function Verifier({ code }: { code: string }) {
           ok,
           detail: st.winner ? `${st.eligible.length} elegíveis (${st.eligible.join(", ")}) · posição sorteada ${st.index! + 1}` : undefined,
         });
+      }
+      const subs = data.substituicoes.filter((x) => x.round === r.round);
+      if (subs.length && !r.reserve_revealed) {
+        push({ label: `${subs.length} novo(s) sorteio(s) por desistência — conferíveis quando o período de desistências for encerrado`, ok: null, detail: r.reserve_commitment ? `Lacre da chave reserva: ${r.reserve_commitment}` : undefined });
+      }
+      if (r.reserve_revealed && r.reserve_commitment) {
+        push({ label: `Rodada ${r.round}: a chave reserva corresponde ao lacre publicado`, ok: (await sha256Hex(r.reserve_revealed)) === r.reserve_commitment });
+        for (const s of subs) {
+          const re = await drawSubstitution({ doc, round: r.round, reserveSeedHex: r.reserve_revealed, entropy: r.public_entropy, period: s.periodo, space: s.salao, n: s.n, excluded: s.excluded });
+          push({ label: `Desistência do apto ${s.desistente} (${s.salao_nome.split(" (")[0]}, ${s.periodo === "natal" ? "Natal" : "Ano Novo"}): novo sorteio ${re.winner ? `apto ${re.winner}` : "sem inscritos"}`,
+            ok: (re.winner ?? null) === (s.novo_vencedor ?? null) && re.eligibleHash === s.eligible_hash });
+        }
       }
       if (r.status === "anulada") push({ label: `Rodada ${r.round} foi anulada: ${r.annul_reason}`, ok: null });
     }

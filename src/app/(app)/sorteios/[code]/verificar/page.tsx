@@ -7,9 +7,8 @@ export default async function Verificar({ params }: { params: Promise<{ code: st
   const { code } = await params;
   return (
     <>
-      <PageHeader eyebrow="Transparência" title="Conferir o sorteio no seu aparelho" back={{ href: `/sorteios/${code}`, label: "Voltar ao sorteio" }}>
-        Esta página refaz todas as contas do sorteio <b>no seu próprio navegador</b>, sem depender do servidor:
-        confere a impressão digital da lista congelada, o lacre da chave secreta e cada vencedor.
+      <PageHeader title="Conferir o sorteio" back={{ href: `/sorteios/${code}`, label: "Voltar" }}>
+        Refaça as contas do sorteio no seu próprio aparelho.
       </PageHeader>
       <Verifier code={code} />
     </>

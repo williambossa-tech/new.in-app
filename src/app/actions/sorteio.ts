@@ -5,6 +5,7 @@ import type { ActionState } from "@/lib/action";
 import { audit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
 import { asUser, friendlyDbError } from "@/lib/db";
+import { RuleError, withdraw } from "@/lib/lottery/engine";
 
 /** Inscrição feita pelo morador no aplicativo (validada também pelas regras do banco). */
 export async function inscreverAction(_: ActionState, f: FormData): Promise<ActionState> {
@@ -17,11 +18,11 @@ export async function inscreverAction(_: ActionState, f: FormData): Promise<Acti
   const accepted = f.get("accept") === "on";
   const fieldErrors: Record<string, string> = {};
   if (name.split(/\s+/).length < 2) fieldErrors.applicant_name = "Informe nome e sobrenome.";
-  if (contact.length < 8) fieldErrors.contact = "Informe um telefone ou e-mail para contato.";
-  if (!combos.length) fieldErrors.combo = "Marque pelo menos um salão e período.";
-  if (!accepted) fieldErrors.accept = "É preciso aceitar as regras e o termo.";
-  if (!me.units.some((u) => u.id === unitId)) fieldErrors.unit_id = "Selecione um apartamento vinculado ao seu cadastro.";
-  if (Object.keys(fieldErrors).length) return { message: "Confira os campos destacados.", fieldErrors };
+  if (contact.length < 8) fieldErrors.contact = "Informe um telefone ou e-mail.";
+  if (!combos.length) fieldErrors.combo = "Escolha pelo menos um salão.";
+  if (!accepted) fieldErrors.accept = "Confirme o aceite para continuar.";
+  if (!me.units.some((u) => u.id === unitId)) fieldErrors.unit_id = "Selecione seu apartamento.";
+  if (Object.keys(fieldErrors).length) return { fieldErrors };
 
   try {
     const result = await asUser(me.id, async (tx) => {
@@ -48,12 +49,8 @@ export async function inscreverAction(_: ActionState, f: FormData): Promise<Acti
       return { added: todo.length, skipped };
     });
     revalidatePath(`/sorteios/${code}`);
-    if (!result.added) return { ok: false, message: "Seu apartamento já estava inscrito em todas as opções marcadas. Nada foi alterado." };
-    return {
-      ok: true,
-      message: `Inscrição registrada: ${result.added} ${result.added === 1 ? "opção" : "opções"}.` +
-        (result.skipped ? ` ${result.skipped} já estava(m) inscrita(s) pelo seu apartamento e não gera(m) chance extra.` : ""),
-    };
+    if (!result.added) return { ok: false, message: "Seu apartamento já está inscrito nessas opções." };
+    return { ok: true, message: "Inscrição confirmada. Boa sorte!" };
   } catch (e) {
     return { message: friendlyDbError(e) };
   }
@@ -71,7 +68,7 @@ export async function cancelarInscricaoAction(_: ActionState, f: FormData): Prom
       if (!e) throw Object.assign(new Error("Inscrição não encontrada."), { code: "P0001" });
       const staff = me.roles.includes("admin");
       if (!staff && e.status !== "inscricoes_abertas")
-        throw Object.assign(new Error("As inscrições estão encerradas; procure a administração."), { code: "P0001" });
+        throw Object.assign(new Error("As inscrições foram encerradas."), { code: "P0001" });
       await tx`update lottery_entries set status = 'cancelada', status_reason = ${staff ? "Cancelada pela administração" : "Cancelada pelo morador"},
                status_changed_at = now(), status_changed_by = ${me.id} where id = ${id}`;
       await audit(tx, { actorId: me.id, actorLabel: me.fullName, action: "sorteio.inscricao_cancelada", entity: "lottery_entry", entityId: id,
@@ -82,4 +79,20 @@ export async function cancelarInscricaoAction(_: ActionState, f: FormData): Prom
   } catch (e) {
     return { message: friendlyDbError(e) };
   }
+}
+
+/** Desistência pelo próprio morador sorteado: o novo sorteio é automático. */
+export async function desistirAction(_: ActionState, f: FormData): Promise<ActionState> {
+  const me = await requireUser();
+  const code = String(f.get("campaign") ?? "");
+  const stageId = String(f.get("stage_id") ?? "");
+  const unit = String(f.get("unit") ?? "");
+  try {
+    await withdraw({ id: me.id, label: me.fullName }, code, stageId, "", "morador", unit);
+  } catch (e) {
+    return { message: e instanceof RuleError ? e.message : friendlyDbError(e) };
+  }
+  revalidatePath("/minhas-reservas");
+  revalidatePath(`/sorteios/${code}`);
+  return { ok: true, message: "Desistência registrada. Obrigado por avisar!" };
 }

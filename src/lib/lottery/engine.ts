@@ -2,7 +2,7 @@ import "server-only";
 import { asSystem, type Tx } from "../db";
 import { audit } from "../audit";
 import {
-  byUnitCode, drawOneStage, freezeHash, randomSeedHex, resolveOrder, sha256Hex, computeRound,
+  byUnitCode, drawOneStage, drawSubstitution, freezeHash, randomSeedHex, resolveOrder, sha256Hex, computeRound,
   type FreezeDoc,
 } from "./core";
 
@@ -236,8 +236,12 @@ export async function concludeRound(actor: Actor, code: string) {
       const got = stored.find((x) => x.period === st.period && x.space === st.space);
       if ((got?.winner ?? null) !== st.winner) throw new RuleError("Falha na conferência interna do resultado. Nada foi concluído; acione o suporte.");
     }
-    await tx`update lottery_rounds set status = 'concluida', concluded_at = now(), concluded_by = ${actor.id}, seed_revealed = ${seed}
+    const reserve = randomSeedHex();
+    const reserveCommitment = await sha256Hex(reserve);
+    await tx`update lottery_rounds set status = 'concluida', concluded_at = now(), concluded_by = ${actor.id}, seed_revealed = ${seed},
+             reserve_commitment = ${reserveCommitment}
              where campaign_id = ${c.id} and round = ${round}`;
+    await tx`insert into lottery_reserve_secrets (campaign_id, round, seed) values (${c.id}, ${round}, ${reserve})`;
     // Reserva de cada vencedor para o período completo (dois dias), com uma única taxa.
     const wins = await tx`
       insert into bookings (space_id, unit_id, responsible_user_id, responsible_name, kind, status, period, blocked, origin,
@@ -253,7 +257,7 @@ export async function concludeRound(actor: Actor, code: string) {
       returning id`;
     await tx`update lottery_campaigns set status = 'concluida', concluded_at = now() where id = ${c.id}`;
     await audit(tx, { actorId: actor.id, actorLabel: actor.label, action: "sorteio.concluir", entity: "lottery_campaign", entityId: code,
-      data: { rodada: round, chave_revelada: seed, reservas_geradas: wins.length } });
+      data: { rodada: round, chave_revelada: seed, reservas_geradas: wins.length, lacre_chave_reserva_desistencias: reserveCommitment } });
   }, actor.id);
 }
 
@@ -266,8 +270,12 @@ export async function annulRound(actor: Actor, code: string, reason: string) {
     if (!["em_sorteio", "concluida"].includes(c.status)) throw new RuleError("Não há rodada em andamento ou concluída para anular.");
     const round = c.current_round;
     const [{ seed }] = await tx`select seed from lottery_secrets where campaign_id = ${c.id} and round = ${round}`;
+    const [res] = await tx`select seed from lottery_reserve_secrets where campaign_id = ${c.id} and round = ${round}`;
     await tx`update lottery_rounds set status = 'anulada', annulled_at = now(), annulled_by = ${actor.id}, annul_reason = ${why},
-             seed_revealed = coalesce(seed_revealed, ${seed}) where campaign_id = ${c.id} and round = ${round}`;
+             seed_revealed = coalesce(seed_revealed, ${seed}),
+             reserve_revealed = coalesce(reserve_revealed, ${res?.seed ?? null}),
+             reserve_revealed_at = case when reserve_revealed is null and ${res?.seed ?? null}::text is not null then now() else reserve_revealed_at end
+             where campaign_id = ${c.id} and round = ${round}`;
     await tx`update lottery_stages set status = 'anulada' where campaign_id = ${c.id} and round = ${round}`;
     const cancelled = await tx`
       update bookings set status = 'cancelada', cancelled_at = now(), cancel_reason = ${"Rodada " + round + " do sorteio anulada: " + why}
@@ -304,5 +312,108 @@ export async function simulate(actor: Actor, code: string, fixedOverride?: Recor
     await audit(tx, { actorId: actor.id, actorLabel: actor.label, action: "sorteio.simulacao", entity: "lottery_simulation", entityId: row.id,
       data: { campanha: code, base: basis } });
     return { id: row.id as string, ...payload };
+  }, actor.id);
+}
+
+// ---------------------------------------------------------------------------
+// Desistência do sorteado → novo sorteio automático entre os demais inscritos
+// ---------------------------------------------------------------------------
+export type StageHolder = { stageId: string; periodId: string; holder: string | null; withdrawn: string[]; n: number };
+
+/** Quem detém cada etapa da rodada agora (considerando desistências). */
+export async function currentHolders(tx: Tx, campaignId: string, round: number): Promise<StageHolder[]> {
+  const stages = await tx`
+    select x.id, x.period_id, u.code as winner from lottery_stages x left join units u on u.id = x.winner_unit_id
+    where x.campaign_id = ${campaignId} and x.round = ${round} and x.status in ('sorteada', 'sem_elegiveis')`;
+  const subs = await tx`
+    select s.stage_id, s.n, w.code as withdrawn, nw.code as new_winner from lottery_substitutions s
+    join units w on w.id = s.withdrawn_unit_id left join units nw on nw.id = s.new_winner_unit_id
+    where s.campaign_id = ${campaignId} and s.round = ${round} order by s.stage_id, s.n`;
+  return stages.map((st) => {
+    const mine = subs.filter((x) => x.stage_id === st.id);
+    const last = mine[mine.length - 1];
+    return {
+      stageId: st.id, periodId: st.period_id,
+      holder: last ? (last.new_winner ?? null) : (st.winner ?? null),
+      withdrawn: mine.map((x) => x.withdrawn as string),
+      n: mine.length,
+    };
+  });
+}
+
+export async function withdraw(actor: Actor, code: string, stageId: string, reason: string, origin: "morador" | "administracao", expectedHolder: string) {
+  const why = reason.trim();
+  if (origin === "administracao" && why.length < 10) throw new RuleError("Registre como a desistência foi comunicada (mínimo de 10 caracteres).");
+  return asSystem(async (tx) => {
+    const c = await lockCampaign(tx, code);
+    if (c.status !== "concluida") throw new RuleError("A desistência só é possível após o resultado oficial.");
+    const round = c.current_round;
+    const [r] = await tx`select public_entropy, reserve_revealed from lottery_rounds where campaign_id = ${c.id} and round = ${round}`;
+    if (r.reserve_revealed) throw new RuleError("O período de desistências deste sorteio foi encerrado.");
+    const [st] = await tx`select x.*, p.code as period_code, s.code as space_code from lottery_stages x
+      join lottery_periods p on p.id = x.period_id join spaces s on s.id = x.space_id
+      where x.id = ${stageId} and x.campaign_id = ${c.id} and x.round = ${round} for update`;
+    if (!st || st.status !== "sorteada") throw new RuleError("Reserva não encontrada.");
+    const holders = await currentHolders(tx, c.id, round);
+    const me = holders.find((h) => h.stageId === stageId)!;
+    if (!me.holder) throw new RuleError("Este salão não tem reserva ativa pelo sorteio.");
+    // Proteção contra clique duplo / tela desatualizada: só desiste quem ainda detém a reserva.
+    if (me.holder !== expectedHolder) throw new RuleError("Esta reserva já foi alterada. Atualize a página.");
+    if (origin === "morador") {
+      const [ok] = await tx`select 1 from unit_memberships m join units u on u.id = m.unit_id join users us on us.id = m.user_id
+        where m.user_id = ${actor.id} and u.code = ${me.holder} and m.status = 'ativo' and us.status = 'ativo'`;
+      if (!ok) throw new RuleError("Somente moradores do apartamento sorteado podem desistir.");
+    } else {
+      await assertAdmin(tx);
+    }
+    const otherHolders = holders.filter((h) => h.periodId === st.period_id && h.stageId !== stageId && h.holder).map((h) => h.holder as string);
+    const excluded = [...new Set([...otherHolders, ...me.withdrawn, me.holder])].sort(byUnitCode);
+    const n = me.n + 1;
+    const [{ seed: reserve }] = await tx`select seed from lottery_reserve_secrets where campaign_id = ${c.id} and round = ${round}`;
+    const res = await drawSubstitution({ doc: c.freeze_doc as FreezeDoc, round, reserveSeedHex: reserve, entropy: r.public_entropy,
+      period: st.period_code, space: st.space_code, n, excluded });
+    const [withdrawnUnit] = await tx`select id from units where code = ${me.holder}`;
+    await tx`update bookings set status = 'cancelada', cancelled_at = now(),
+             cancel_reason = ${origin === "morador" ? "Desistência registrada pelo morador" : "Desistência registrada pela administração: " + why}
+             where lottery_stage_id = ${stageId} and unit_id = ${withdrawnUnit.id} and status in ('solicitada', 'confirmada')`;
+    let newUnitId: string | null = null, newEntryId: string | null = null;
+    if (res.winner) {
+      const [w] = await tx`select e.id as entry_id, e.unit_id from lottery_entries e join units u on u.id = e.unit_id
+        where e.campaign_id = ${c.id} and u.code = ${res.winner} and e.period_id = ${st.period_id} and e.space_id = ${st.space_id} and e.status = 'ativa'`;
+      newUnitId = w.unit_id; newEntryId = w.entry_id;
+      await tx`
+        insert into bookings (space_id, unit_id, responsible_user_id, responsible_name, kind, status, period, blocked, origin,
+                              lottery_stage_id, fee_status, notes, created_by)
+        select ${st.space_id}, ${newUnitId}, e.applicant_user_id, e.applicant_name, 'salao_festivo', 'confirmada',
+               tstzrange(p.start_date::timestamp at time zone 'America/Sao_Paulo', (p.end_date + 1)::timestamp at time zone 'America/Sao_Paulo', '[)'),
+               tstzrange(p.start_date::timestamp at time zone 'America/Sao_Paulo', (p.end_date + 1)::timestamp at time zone 'America/Sao_Paulo', '[)'),
+               'sorteio', ${stageId}, 'pendente_definicao', 'Reserva gerada por novo sorteio após desistência.', ${actor.id}
+        from lottery_entries e join lottery_periods p on p.id = e.period_id where e.id = ${newEntryId}`;
+    }
+    await tx`insert into lottery_substitutions (campaign_id, round, stage_id, n, withdrawn_unit_id, origin, reason, requested_by,
+               eligible, eligible_hash, excluded, draw_index, rng_counter, new_winner_unit_id, new_winner_entry_id)
+             values (${c.id}, ${round}, ${stageId}, ${n}, ${withdrawnUnit.id}, ${origin}, ${why || "Desistência pelo aplicativo"}, ${actor.id},
+                     ${tx.json(res.eligible as never)}, ${res.eligibleHash}, ${tx.json(excluded as never)}, ${res.index}, ${res.counter},
+                     ${newUnitId}, ${newEntryId})`;
+    await audit(tx, { actorId: actor.id, actorLabel: actor.label, action: "sorteio.desistencia", entity: "lottery_stage", entityId: stageId,
+      data: { campanha: code, rodada: round, periodo: st.period_code, salao: st.space_code, desistencia: n, desistente: me.holder,
+              origem: origin, motivo: why || null, elegiveis: res.eligible, excluidos: excluded, hash_elegiveis: res.eligibleHash,
+              posicao_sorteada: res.index === null ? null : res.index + 1, contador: res.counter, novo_vencedor: res.winner } });
+    return { newWinner: res.winner };
+  }, actor.id);
+}
+
+/** Encerra o período de desistências e revela a chave reserva, permitindo conferir os novos sorteios. */
+export async function revealReserve(actor: Actor, code: string) {
+  return asSystem(async (tx) => {
+    await assertAdmin(tx);
+    const c = await lockCampaign(tx, code);
+    if (c.status !== "concluida") throw new RuleError("Não há resultado oficial concluído.");
+    const [r] = await tx`select reserve_revealed from lottery_rounds where campaign_id = ${c.id} and round = ${c.current_round}`;
+    if (r.reserve_revealed) throw new RuleError("A chave reserva já foi revelada.");
+    const [{ seed }] = await tx`select seed from lottery_reserve_secrets where campaign_id = ${c.id} and round = ${c.current_round}`;
+    await tx`update lottery_rounds set reserve_revealed = ${seed}, reserve_revealed_at = now() where campaign_id = ${c.id} and round = ${c.current_round}`;
+    await audit(tx, { actorId: actor.id, actorLabel: actor.label, action: "sorteio.revelar_reserva", entity: "lottery_campaign", entityId: code,
+      data: { rodada: c.current_round, chave_reserva_revelada: seed } });
   }, actor.id);
 }

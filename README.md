@@ -1,6 +1,6 @@
-# NEW.IN Reservas
+# NEW.IN Comunidade
 
-Aplicativo web do Condomínio NEW.IN (Curitiba/PR) para reservas de espaços, cobrança do Be My Guest e sorteio dos salões nas festas de fim de ano.
+Aplicativo web da comunidade do Condomínio NEW.IN (Curitiba/PR): eventos coletivos, sorteio dos salões nas festas de fim de ano, reservas de espaços e cobrança do Be My Guest.
 
 ## Situação por etapa
 
@@ -26,8 +26,9 @@ Aplicativo web do Condomínio NEW.IN (Curitiba/PR) para reservas de espaços, co
 4. Cada etapa sorteia uma posição com `HMAC-SHA256(chave, número público | campanha | rodada | período | salão | contador)`, usando amostragem por rejeição para que a escolha seja uniforme.
 5. O vencedor sai das etapas seguintes do mesmo período. Isso acontece na mesma transação, com a campanha travada: não há execução dupla, e clicar duas vezes ou atualizar a página devolve o resultado já gravado.
 6. Ao concluir, a chave é revelada. A página **Sorteios → Verificar** refaz tudo no navegador do morador com o mesmo código (`src/lib/lottery/core.ts`).
-7. Uma anulação não apaga nada: exige justificativa, fica no histórico e lacra uma nova chave.
-8. A **ata em PDF** traz fontes, lista congelada, lacre, número público, elegíveis de cada etapa, posição sorteada, operador, horários, chave revelada e o último hash da trilha de auditoria, com espaço para assinaturas.
+7. **Desistência:** quando o sorteado desiste (pelo próprio aplicativo ou registrada pela administração), um novo sorteio entre os demais inscritos é feito na hora. Ficam de fora os apartamentos que já têm salão no período e quem já desistiu daquele salão. Esse novo sorteio usa uma chave reserva, lacrada na conclusão e revelada quando a administração encerra o período de desistências.
+8. Uma anulação não apaga nada: exige justificativa, fica no histórico e lacra uma nova chave.
+9. A **ata em PDF** traz fontes, lista congelada, lacre, número público, elegíveis de cada etapa, posição sorteada, operador, horários, chave revelada e o último hash da trilha de auditoria, com espaço para assinaturas.
 
 ## Rodar localmente
 

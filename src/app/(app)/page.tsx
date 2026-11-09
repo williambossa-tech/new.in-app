@@ -1,14 +1,22 @@
 import Link from "next/link";
 import { Corujinha } from "@/components/Corujinha";
-import { CampaignBadge } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { asUser } from "@/lib/db";
-import { fmtDate, fmtDateTime, RELATION_LABEL } from "@/lib/format";
+import { fmtDate, fmtDateTime } from "@/lib/format";
+
+const STATUS_TEXT: Record<string, string> = {
+  rascunho: "Em breve",
+  inscricoes_abertas: "Inscrições abertas",
+  inscricoes_encerradas: "Inscrições encerradas",
+  congelada: "Sorteio em breve",
+  em_sorteio: "Sorteio acontecendo agora",
+  concluida: "Resultado disponível",
+};
 
 export default async function Inicio() {
   const me = await requireUser();
   const data = await asUser(me.id, async (tx) => {
-    const campaigns = await tx`select code, title, status, registration_deadline_date, registration_deadline, draw_date
+    const campaigns = await tx`select code, title, status, registration_deadline_date, registration_deadline, draw_date, draw_at
                                from lottery_campaigns c where status <> 'cancelada' order by created_at desc`;
     const bookings = await tx`select count(*)::int as n from bookings where status in ('solicitada','confirmada','em_uso') and upper(period) > now()`;
     return { campaigns, upcoming: bookings[0].n as number };
@@ -19,54 +27,59 @@ export default async function Inicio() {
   const greet = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
 
   return (
-    <div className="space-y-6">
-      <section className="card relative overflow-hidden bg-gradient-to-br from-white to-violeta-50 p-6 sm:p-8">
-        <div className="relative z-10 max-w-[62%] sm:max-w-[70%]">
-          <p className="eyebrow">{greet}, {firstName}!</p>
-          <h1 className="h1 mt-1">O que você quer reservar hoje?</h1>
-          <p className="mt-2 muted">
-            {me.units.length
-              ? <>Apartamento {me.units.map((u) => `${u.code} (${RELATION_LABEL[u.relation]?.toLowerCase()})`).join(", ")}.</>
-              : <>Seu cadastro ainda não tem apartamento vinculado. Fale com a administração.</>}
+    <div className="space-y-10">
+      <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-violeta-50 via-white to-white px-7 py-9 ring-1 ring-linha sm:px-10 sm:py-12">
+        <div className="relative z-10 max-w-[60%] sm:max-w-[65%]">
+          <p className="text-noite-50">{greet},</p>
+          <h1 className="h1 mt-1">{firstName}</h1>
+          <p className="mt-3 text-noite-70">
+            {me.units.length ? <>Apartamento {me.units.map((u) => u.code).join(" · ")}</> : <>Bem-vindo à comunidade NEW.IN</>}
           </p>
         </div>
-        <Corujinha pose="ola" size={170} className="owl-bob absolute -bottom-3 right-2 sm:right-8" alt="" />
+        <Corujinha pose="ola" size={160} className="owl-bob absolute -bottom-2 right-3 sm:right-10" alt="" />
       </section>
 
       {camp && (
-        <Link href={`/sorteios/${camp.code}`} className="card group flex items-center gap-4 overflow-hidden p-5 transition hover:ring-violeta sm:p-6">
-          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-coral-50 text-3xl">🎄</div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2"><CampaignBadge status={camp.status} /></div>
-            <p className="mt-1 text-lg font-black leading-snug">{camp.title}</p>
-            <p className="text-sm muted">
-              Inscrições até {fmtDate(camp.registration_deadline_date)} · Sorteio em {fmtDate(camp.draw_date)}
-              {camp.status === "inscricoes_abertas" && camp.registration_deadline && <> · encerra {fmtDateTime(camp.registration_deadline)}</>}
-            </p>
-          </div>
-          <span className="hidden text-2xl text-violeta transition group-hover:translate-x-1 sm:block">→</span>
-        </Link>
+        <section>
+          <h2 className="mb-4 text-sm font-medium text-noite-50">Acontecendo</h2>
+          <Link href={`/sorteios/${camp.code}`} className="card group flex items-center gap-5 p-6 transition hover:shadow-lg sm:p-7">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-coral-50 text-2xl">🎄</div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-violeta">{STATUS_TEXT[camp.status] ?? ""}</p>
+              <p className="mt-0.5 text-[1.05rem] font-semibold leading-snug">{camp.title}</p>
+              <p className="mt-1 text-sm text-noite-50">
+                {camp.status === "inscricoes_abertas"
+                  ? <>Inscrições até {camp.registration_deadline ? fmtDateTime(camp.registration_deadline).replace(",", " às") : fmtDate(camp.registration_deadline_date)}</>
+                  : <>Sorteio em {fmtDate(camp.draw_date)}</>}
+              </p>
+            </div>
+            <span className="text-xl text-noite-50 transition group-hover:translate-x-1 group-hover:text-violeta">›</span>
+          </Link>
+        </section>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <ModuleCard href="/be-my-guest" emoji="🛏️" title="Be My Guest" text="Quartos para hospedar seus convidados." tag="Em preparação" />
-        <ModuleCard href="/coworking" emoji="💼" title="Coworking" text="Sala de reuniões e mini sala." tag="Em preparação" />
-        <ModuleCard href="/minhas-reservas" emoji="📅" title="Minhas reservas"
-          text={data.upcoming ? `${data.upcoming} reserva(s) futura(s) do seu apartamento.` : "Acompanhe as reservas do seu apartamento."} />
-      </div>
+      <section>
+        <h2 className="mb-4 text-sm font-medium text-noite-50">Espaços</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <ModuleCard href="/be-my-guest" emoji="🛏️" title="Be My Guest" text="Suítes para seus convidados" soon />
+          <ModuleCard href="/coworking" emoji="💼" title="Coworking" text="Sala de reuniões e mini sala" soon />
+          <ModuleCard href="/minhas-reservas" emoji="📅" title="Minhas reservas"
+            text={data.upcoming ? `${data.upcoming} ${data.upcoming === 1 ? "reserva futura" : "reservas futuras"}` : "Suas reservas em um só lugar"} />
+        </div>
+      </section>
     </div>
   );
 }
 
-function ModuleCard({ href, emoji, title, text, tag }: { href: string; emoji: string; title: string; text: string; tag?: string }) {
+function ModuleCard({ href, emoji, title, text, soon }: { href: string; emoji: string; title: string; text: string; soon?: boolean }) {
   return (
-    <Link href={href} className="card block p-5 transition hover:ring-violeta">
-      <div className="flex items-center justify-between">
-        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-violeta-50 text-2xl">{emoji}</span>
-        {tag && <span className="badge-cinza">{tag}</span>}
+    <Link href={href} className="card block p-6 transition hover:shadow-lg">
+      <div className="flex items-start justify-between">
+        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-violeta-50 text-xl">{emoji}</span>
+        {soon && <span className="text-xs font-medium text-noite-50">Em breve</span>}
       </div>
-      <p className="mt-3 text-lg font-black">{title}</p>
-      <p className="text-sm muted">{text}</p>
+      <p className="mt-5 font-semibold">{title}</p>
+      <p className="mt-0.5 text-sm text-noite-50">{text}</p>
     </Link>
   );
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  anularAction, concluirAction, congelarAction, horarioAction, iniciarAction, invalidarInscricaoAction, lancarEmailAction,
+  anularAction, concluirAction, congelarAction, desistenciaAdminAction, horarioAction, revelarReservaAction, iniciarAction, invalidarInscricaoAction, lancarEmailAction,
   ordemAction, simularAction, situacaoInscricoesAction, sortearEtapaAction,
 } from "@/app/actions/admin-sorteio";
 import { AdminTabs } from "@/components/AppShell";
@@ -276,7 +276,7 @@ export default async function AdminSorteio({ params, searchParams }: { params: P
                           <li key={s.id} className="rounded-xl bg-fundo p-3">
                             <div className="flex items-center justify-between gap-2">
                               <span className="font-bold">{s.seq}º · {s.space_name.split(" (")[0]}</span>
-                              {s.status === "sorteada" && <span className="text-xl font-black text-violeta-700">Apto {s.winner_code}</span>}
+                              {s.status === "sorteada" && <span className="text-xl font-black text-violeta-700">{s.holder_code ? `Apto ${s.holder_code}` : "Sem titular"}{s.holder_code !== s.winner_code && <span className="ml-1 text-xs font-normal text-noite-50">(sorteado: {s.winner_code})</span>}</span>}
                               {s.status === "sem_elegiveis" && <span className="badge-cinza">Sem elegíveis</span>}
                               {s.status === "anulada" && <span className="badge-coral">Anulada</span>}
                               {s.status === "pendente" && next?.id === s.id && c.status === "em_sorteio" && (
@@ -286,6 +286,23 @@ export default async function AdminSorteio({ params, searchParams }: { params: P
                                 </ActionForm>
                               )}
                             </div>
+                            {(s.substitutions as Record<string, unknown>[] as { id: string; n: number; withdrawn_code: string; origin: string; reason: string; eligible: string[]; new_winner_code: string | null; created_at: Date }[])?.map((x) => (
+                              <p key={x.id} className="mt-1 text-xs text-[#8a6100]">
+                                {x.n}ª desistência: apto {x.withdrawn_code} ({x.origin === "morador" ? "pelo morador" : `pela administração — ${x.reason}`}) ·
+                                novo sorteio entre {(x.eligible as string[]).length}: {x.new_winner_code ? <b>apto {x.new_winner_code}</b> : "sem inscritos disponíveis"} · {fmtDateTimeSec(x.created_at)}
+                              </p>
+                            ))}
+                            {c.status === "concluida" && s.status === "sorteada" && s.holder_code && !round?.reserve_revealed && (
+                              <details className="mt-2">
+                                <summary className="cursor-pointer text-xs font-bold text-[#c23a2b]">Registrar desistência do apto {s.holder_code}</summary>
+                                <ActionForm action={desistenciaAdminAction} className="mt-2 space-y-2">
+                                  <input type="hidden" name="campaign" value={code} /><input type="hidden" name="stage_id" value={s.id} />
+                                  <input type="hidden" name="unit" value={s.holder_code} />
+                                  <input className="input min-h-10 text-sm" name="reason" placeholder="Como a desistência foi comunicada (ex.: e-mail de 02/12)" required />
+                                  <SubmitButton className="btn-danger btn-sm" confirm={`Registrar a desistência do apto ${s.holder_code} e sortear novamente entre os demais inscritos?`}>Registrar e sortear novamente</SubmitButton>
+                                </ActionForm>
+                              </details>
+                            )}
                             {s.eligible && (
                               <p className="mt-1 text-xs text-noite-50">
                                 {(s.eligible as string[]).length} elegível(is): {(s.eligible as string[]).join(", ") || "—"}
@@ -308,6 +325,23 @@ export default async function AdminSorteio({ params, searchParams }: { params: P
               </ActionForm>
             )}
             {round?.seed_revealed && <p className="mt-3 text-sm">Chave revelada: <span className="mono">{round.seed_revealed}</span></p>}
+            {round?.reserve_commitment && (
+              <div className="mt-4 rounded-2xl bg-fundo p-4 text-sm">
+                <p className="font-bold">Desistências</p>
+                <p className="text-noite-70">Na desistência do sorteado, o novo sorteio entre os demais inscritos é automático e usa a chave reserva lacrada na conclusão.</p>
+                <p className="mt-1">Lacre da chave reserva: <span className="mono">{round.reserve_commitment}</span></p>
+                {round.reserve_revealed ? (
+                  <p className="mt-1">Período encerrado em {fmtDateTime(round.reserve_revealed_at)} · chave reserva: <span className="mono">{round.reserve_revealed}</span></p>
+                ) : c.status === "concluida" && (
+                  <ActionForm action={revelarReservaAction} className="mt-2">
+                    <input type="hidden" name="campaign" value={code} />
+                    <SubmitButton className="btn-secondary btn-sm" confirm="Encerrar o período de desistências e revelar a chave reserva? Depois disso, novas desistências não geram novo sorteio.">
+                      Encerrar desistências e revelar chave reserva
+                    </SubmitButton>
+                  </ActionForm>
+                )}
+              </div>
+            )}
             {["em_sorteio", "concluida"].includes(c.status) && (
               <details className="mt-5 rounded-2xl border border-[#ffd0ca] p-4">
                 <summary className="cursor-pointer font-black text-[#c23a2b]">Anular esta rodada…</summary>

@@ -175,3 +175,14 @@ export async function invalidarInscricaoAction(_: ActionState, f: FormData): Pro
     return { ok: true, message: "Inscrição invalidada." };
   } catch (e) { return fail(friendlyDbError(e)); }
 }
+
+export async function desistenciaAdminAction(_: ActionState, f: FormData) {
+  const code = String(f.get("campaign"));
+  return run(code, (a) => engine.withdraw(a, code, String(f.get("stage_id")), String(f.get("reason") ?? ""), "administracao", String(f.get("unit"))),
+    "Desistência registrada e novo sorteio realizado.");
+}
+
+export async function revelarReservaAction(_: ActionState, f: FormData) {
+  const code = String(f.get("campaign"));
+  return run(code, (a) => engine.revealReserve(a, code), "Período de desistências encerrado e chave reserva revelada.");
+}

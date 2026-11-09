@@ -7,7 +7,7 @@ import type { FreezeDoc } from "@/lib/lottery/core";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VIOLETA = "#5546d1";
+const VIOLETA = "#5627e0";
 const NOITE = "#1d2b4f";
 const CINZA = "#4a5675";
 
@@ -39,10 +39,17 @@ export async function GET(_: Request, { params }: { params: Promise<{ code: stri
              count(distinct unit_id) filter (where status = 'ativa')::int as unidades
       from lottery_entries where campaign_id = ${c.id}`;
     const [chain] = await tx`select * from app.audit_verify()`;
-    return { c, periods, venues, rounds, stages, entries: entries[0], chain };
+    const subs = await tx`
+      select s.*, w.code as withdrawn_code, nw.code as new_winner_code, us.full_name as requested_by_name, x.round as stage_round,
+             p.label as period_label, sp.name as space_name
+      from lottery_substitutions s join lottery_stages x on x.id = s.stage_id join lottery_periods p on p.id = x.period_id
+      join spaces sp on sp.id = x.space_id join units w on w.id = s.withdrawn_unit_id left join units nw on nw.id = s.new_winner_unit_id
+      join users us on us.id = s.requested_by where s.campaign_id = ${c.id} order by s.created_at`;
+    const rres = await tx`select round, reserve_commitment, reserve_revealed, reserve_revealed_at from lottery_rounds where campaign_id = ${c.id} order by round`;
+    return { c, periods, venues, rounds, stages, entries: entries[0], chain, subs, rres };
   });
   if (!d) return new Response("Campanha não encontrada", { status: 404 });
-  const { c, periods, venues, rounds, stages, entries, chain } = d;
+  const { c, periods, venues, rounds, stages, entries, chain, subs, rres } = d;
   const doc0 = c.freeze_doc as FreezeDoc | null;
   const spaceName = (sc: string) => venues.find((v) => v.code === sc)?.name ?? sc;
   const periodLabel = (pc: string) => periods.find((p) => p.code === pc)?.label ?? pc;
@@ -139,20 +146,39 @@ export async function GET(_: Request, { params }: { params: Promise<{ code: stri
     if (r.seed_revealed) { kv("Chave revelada", ""); mono(r.seed_revealed); }
   }
 
-  h1("6. Resultado oficial");
+  h1("6. Desistências e novos sorteios");
+  for (const rr of rres.filter((x) => x.reserve_commitment)) {
+    kv(`Lacre da chave reserva — rodada ${rr.round}`, "");
+    mono(rr.reserve_commitment);
+    if (rr.reserve_revealed) { kv("Período de desistências encerrado em", fmtDateTimeSec(rr.reserve_revealed_at)); kv("Chave reserva revelada", ""); mono(rr.reserve_revealed); }
+  }
+  if (!subs.length) p("Nenhuma desistência registrada.");
+  for (const s of subs) {
+    pdf.moveDown(0.3).font("Helvetica-Bold").fontSize(10).fillColor(VIOLETA).text(`${s.period_label} · ${s.space_name} · ${s.n}ª desistência`);
+    pdf.fillColor(NOITE);
+    p(`Desistente: apartamento ${s.withdrawn_code} — ${s.origin === "morador" ? "registrada pelo próprio morador no aplicativo" : `registrada pela administração (${s.reason})`} por ${s.requested_by_name} em ${fmtDateTimeSec(s.created_at)}`, { indent: 10 });
+    p(`Excluídos do novo sorteio: ${(s.excluded as string[]).join(", ")}`, { indent: 10 });
+    p(`Elegíveis (${(s.eligible as string[]).length}): ${(s.eligible as string[]).join(", ") || "nenhum"}`, { indent: 10 });
+    p(s.new_winner_code ? `Posição sorteada: ${s.draw_index + 1}  ·  NOVO VENCEDOR: APARTAMENTO ${s.new_winner_code}` : "Sem inscritos disponíveis: o salão fica sem reserva pelo sorteio.", { indent: 10 });
+    pdf.font("Courier").fontSize(7.5).fillColor(CINZA).text(`hash dos elegíveis: ${s.eligible_hash}`, { indent: 10 });
+  }
+
+  h1("7. Resultado oficial");
   const official = stages.filter((s) => s.round === c.current_round && ["sorteada", "sem_elegiveis"].includes(s.status));
   if (c.status === "concluida" && official.length) {
     for (const per of periods) {
       pdf.font("Helvetica-Bold").fontSize(10.5).fillColor(NOITE).text(per.label);
       for (const s of official.filter((x) => x.period_code === per.code)) {
-        p(`${s.space_name}: ${s.winner_code ? `apartamento ${s.winner_code}` : "sem elegíveis"}`, { indent: 10 });
+        const chain2 = subs.filter((x) => x.stage_id === s.id);
+        const holder = chain2.length ? chain2[chain2.length - 1].new_winner_code : s.winner_code;
+        p(`${s.space_name}: ${holder ? `apartamento ${holder}` : "sem reserva"}${chain2.length ? ` (sorteado originalmente: ${s.winner_code}; ${chain2.length} desistência(s))` : ""}`, { indent: 10 });
       }
     }
     pdf.moveDown(0.3);
-    p("Cada reserva abrange o período completo de dois dias, com uma única taxa (valor pendente de definição). Horários de entrega e devolução, prazo de confirmação pelo vencedor e tratamento de desistências dependem de política a ser aprovada pela administração.", { });
+    p("Cada reserva abrange o período completo de dois dias (exceção ao item 20.14 para datas festivas), com uma única taxa. Na desistência do sorteado, novo sorteio automático entre os demais inscritos.");
   } else p("Ainda não há resultado oficial concluído.");
 
-  h1("7. Como conferir");
+  h1("8. Como conferir");
   p("Qualquer morador pode refazer o sorteio no aplicativo (Sorteios > Verificar): (a) o SHA-256 do documento canônico da lista deve ser igual à impressão digital acima; (b) o SHA-256 da chave revelada deve ser igual ao lacre publicado antes do sorteio; (c) para cada etapa, a posição sorteada é obtida por HMAC-SHA256(chave, número público | campanha | rodada | período | salão | contador), usando os 48 primeiros bits com amostragem por rejeição, o que garante escolha uniforme entre os elegíveis.");
   pdf.moveDown(0.3);
   kv("Trilha de auditoria no momento da geração", `${chain.ok ? "íntegra" : `DIVERGÊNCIA a partir do evento ${chain.first_broken}`} · ${chain.total} eventos`);
@@ -160,7 +186,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ code: stri
 
   // Assinaturas
   if (pdf.y > pdf.page.height - 260) pdf.addPage();
-  h1("8. Assinaturas");
+  h1("9. Assinaturas");
   pdf.moveDown(1.5);
   const sig = (label: string) => {
     const y = pdf.y + 26;

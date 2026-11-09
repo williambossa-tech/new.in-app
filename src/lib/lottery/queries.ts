@@ -13,7 +13,8 @@ export async function loadCampaign(userId: string, code: string) {
       from lottery_venues v join spaces s on s.id = v.space_id where v.campaign_id = ${c.id} order by s.sort_order`;
     const counts = await tx`select * from app.lottery_counts(${c.id})`;
     const rounds = await tx`
-      select round, status, seed_commitment, sealed_at, public_entropy, started_at, order_doc, concluded_at, seed_revealed, annulled_at, annul_reason
+      select round, status, seed_commitment, sealed_at, public_entropy, started_at, order_doc, concluded_at, seed_revealed, annulled_at, annul_reason,
+             reserve_commitment, reserve_revealed, reserve_revealed_at
       from lottery_rounds where campaign_id = ${c.id} order by round`;
     const stages = await tx`
       select x.id, x.round, x.seq, x.status, x.eligible, x.eligible_hash, x.excluded, x.draw_index, x.rng_counter, x.executed_at,
@@ -22,6 +23,18 @@ export async function loadCampaign(userId: string, code: string) {
       left join units u on u.id = x.winner_unit_id
       where x.campaign_id = ${c.id} order by x.round, p.sort, x.seq`;
     const params = await tx`select key, label, description, status, value, source from parameters where module = 'sorteio' order by key`;
+    const subs = await tx`
+      select s.id, s.stage_id, s.round, s.n, s.origin, s.reason, s.created_at, s.eligible, s.excluded, s.eligible_hash, s.draw_index,
+             w.code as withdrawn_code, nw.code as new_winner_code, us.full_name as requested_by_name
+      from lottery_substitutions s join units w on w.id = s.withdrawn_unit_id left join units nw on nw.id = s.new_winner_unit_id
+      join users us on us.id = s.requested_by
+      where s.campaign_id = ${c.id} order by s.stage_id, s.n`;
+    // Titular atual de cada etapa (resultado original ou o último novo sorteio após desistência)
+    for (const st of stages) {
+      const mine = subs.filter((x) => x.stage_id === st.id);
+      st.holder_code = mine.length ? mine[mine.length - 1].new_winner_code ?? null : st.winner_code ?? null;
+      st.substitutions = mine;
+    }
     return {
       campaign: c,
       periods,
@@ -30,6 +43,7 @@ export async function loadCampaign(userId: string, code: string) {
       rounds,
       stages,
       params,
+      subs,
     };
   });
 }

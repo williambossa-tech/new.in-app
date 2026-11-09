@@ -18,8 +18,8 @@ export async function AppShell({ user, children, wide = false }: { user: Session
     { href: "/", label: "Início", icon: "🏠" },
     { href: "/be-my-guest", label: "Be My Guest", icon: "🛏️" },
     { href: "/coworking", label: "Coworking", icon: "💼" },
-    { href: "/sorteios", label: "Sorteios", icon: "🎄" },
-    { href: "/minhas-reservas", label: "Minhas reservas", icon: "📅" },
+    { href: "/sorteios", label: "Sorteio", icon: "🎄" },
+    { href: "/minhas-reservas", label: "Reservas", icon: "📅" },
   ];
   const admin = user.roles.includes("admin");
   const firstName = user.fullName.split(" ")[0];
@@ -27,10 +27,10 @@ export async function AppShell({ user, children, wide = false }: { user: Session
     <div className="min-h-dvh pb-24 lg:pb-10">
       <EnvBanner />
       <header className="no-print bg-gradient-to-br from-violeta to-violeta-700 text-white">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-3.5">
           <Link href="/" className="flex items-baseline gap-2" aria-label="Início">
-            <span className="text-[1.35rem] font-black tracking-tight">NEW.IN</span>
-            <span className="text-sm font-bold text-white/75">Reservas</span>
+            <span className="text-[1.3rem] font-bold tracking-[-0.02em]">NEW.IN</span>
+            <span className="hidden text-sm font-medium text-white/70 sm:inline">Comunidade</span>
           </Link>
           <div className="flex-1"><TopNav items={items} /></div>
           {admin && (
@@ -57,7 +57,7 @@ export async function AppShell({ user, children, wide = false }: { user: Session
           </details>
         </div>
       </header>
-      <main className={`mx-auto px-4 py-6 sm:py-8 ${wide ? "max-w-6xl" : "max-w-5xl"}`}>{children}</main>
+      <main className={`mx-auto px-5 py-8 sm:py-12 ${wide ? "max-w-6xl" : "max-w-4xl"}`}>{children}</main>
       <BottomNav items={items} />
     </div>
   );
