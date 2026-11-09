@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/action";
 import { requireRole } from "@/lib/auth";
-import { testAi } from "@/lib/corujinha";
+import { testAi } from "@/lib/ai";
 
 export async function testarIaAction(_s: ActionState, _f: FormData): Promise<ActionState> {
   await requireRole("admin");

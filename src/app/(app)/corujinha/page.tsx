@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth";
-import { aiState, apiKey, corujinhaStatus, LIMIT } from "@/lib/corujinha";
+import { aiConfig, aiState } from "@/lib/ai";
+import { corujinhaStatus, LIMIT } from "@/lib/corujinha";
 import { AiStatus } from "./AiStatus";
 import { Chat } from "./Chat";
 
@@ -14,7 +15,7 @@ export default async function CorujinhaPage() {
         <p className="text-sm font-medium text-violeta">Regimento Interno e Convenção</p>
         <h1 className="h1">Pergunte à Corujinha</h1>
       </div>
-      <Chat firstName={me.fullName.split(" ")[0]} remaining={s.remaining} limit={LIMIT} aiOn={!!apiKey()} />
+      <Chat firstName={me.fullName.split(" ")[0]} remaining={s.remaining} limit={LIMIT} aiOn={!!aiConfig()} />
       {me.roles.includes("admin") && <AiStatus s={aiState()} />}
     </div>
   );

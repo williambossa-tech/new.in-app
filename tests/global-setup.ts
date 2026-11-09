@@ -8,4 +8,5 @@ export default async function setup() {
   await sql.unsafe("drop schema if exists public cascade; drop schema if exists app cascade; create schema public;");
   await sql.end();
   execFileSync("node", ["scripts/migrate.mjs"], { env: { ...process.env, DATABASE_URL: url, APP_ENV: "demonstracao" }, stdio: "inherit" });
+  execFileSync("node", ["scripts/load-kb.mjs"], { env: { ...process.env, DATABASE_URL: url }, stdio: "inherit" });
 }
