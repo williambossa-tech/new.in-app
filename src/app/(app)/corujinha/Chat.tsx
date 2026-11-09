@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CondominioOwl, type CondominioOwlHandle } from "@/components/CondominioOwl";
 import { Corujinha } from "@/components/Corujinha";
 
 type Ref = { source: "regimento" | "convencao"; ref: string; title: string | null; body: string };
-type Msg = { who: "eu" | "coruja"; text: string; refs?: Ref[]; mode?: string; limited?: boolean; resetAt?: string | null };
+type Msg = { who: "eu" | "coruja"; id?: string; text: string; refs?: Ref[]; mode?: string; limited?: boolean; resetAt?: string | null };
 
 const SUGG = [
   "Posso levar meu cachorro na piscina?",
@@ -16,12 +17,25 @@ const SUGG = [
 const label = (r: Ref) => `${r.source === "regimento" ? "Regimento" : "Convenção"} · ${r.ref}`;
 const fmt = (iso: string) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 
-export function Chat({ firstName, remaining: initial, limit, aiOn }: { firstName: string; remaining: number; limit: number; aiOn: boolean }) {
+export function Chat({ firstName, remaining: initial, limit, aiOn, vozOn }: { firstName: string; remaining: number; limit: number; aiOn: boolean; vozOn: boolean }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [remaining, setRemaining] = useState(initial);
   const end = useRef<HTMLDivElement>(null);
+  const owl = useRef<CondominioOwlHandle>(null);
+  const [lendo, setLendo] = useState<string | null>(null);
+  const [falhaVoz, setFalhaVoz] = useState<string | null>(null);
+  const estado = busy ? "thinking" : q.trim() ? "listening" : "idle";
+
+  async function ouvir(id: string) {
+    if (lendo === id) { owl.current?.stop(); setLendo(null); return; }
+    setLendo(id); setFalhaVoz(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    const r = await owl.current?.speak({ perguntaId: id, estado: "talking" });
+    if (r === "error") setFalhaVoz(id);
+    setLendo((cur) => (cur === id ? null : cur));
+  }
   useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [msgs, busy]);
 
   async function ask(text: string) {
@@ -34,7 +48,7 @@ export function Chat({ firstName, remaining: initial, limit, aiOn }: { firstName
       const j = await r.json();
       if (!r.ok) throw new Error(j.erro ?? "Erro");
       setRemaining(j.remaining);
-      setMsgs((m) => [...m, { who: "coruja", text: j.answer, refs: j.refs, mode: j.mode, limited: j.limited, resetAt: j.resetAt }]);
+      setMsgs((m) => [...m, { who: "coruja", id: j.mode === "ia" ? j.id : undefined, text: j.answer, refs: j.refs, mode: j.mode, limited: j.limited, resetAt: j.resetAt }]);
     } catch (e) {
       setMsgs((m) => [...m, { who: "coruja", text: (e as Error).message === "Erro" ? "Ops, não consegui responder agora. Tente de novo em instantes." : (e as Error).message }]);
     } finally { setBusy(false); }
@@ -44,7 +58,7 @@ export function Chat({ firstName, remaining: initial, limit, aiOn }: { firstName
     <div className="flex min-h-[70dvh] flex-col">
       <div className="flex-1 space-y-5 pb-6">
         <div className="flex items-end gap-3">
-          <Corujinha pose="ola" size={64} className="owl-bob shrink-0" alt="" />
+          <CondominioOwl ref={owl} estado={estado} className="h-[104px] w-[104px] shrink-0 -ml-3 -mb-2 sm:h-[124px] sm:w-[124px]" ariaLabel="Corujinha" />
           <div className="max-w-[85%] rounded-3xl rounded-bl-md bg-white px-5 py-4 shadow-sm ring-1 ring-linha">
             <p>Oi, {firstName}! Sou a Corujinha. Pergunte sobre as regras do NEW.IN que eu procuro no Regimento Interno e na Convenção e te mostro de onde tirei.</p>
           </div>
@@ -62,6 +76,12 @@ export function Chat({ firstName, remaining: initial, limit, aiOn }: { firstName
             <div className="pop-in max-w-[85%] rounded-3xl rounded-bl-md bg-white px-5 py-4 shadow-sm ring-1 ring-linha">
               {m.limited && m.resetAt && <p className="mb-2 text-sm text-[#8a6100]">Seu apartamento usou as {limit} perguntas dos últimos 3 dias. Novas respostas da Corujinha liberam em {fmt(m.resetAt)}. Enquanto isso, veja os trechos encontrados.</p>}
               <p className="whitespace-pre-line">{m.text}</p>
+              {vozOn && m.id && (
+                <button type="button" onClick={() => ouvir(m.id!)} className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-violeta-50 px-3 py-1.5 text-sm font-medium text-violeta-700 transition hover:bg-violeta-100">
+                  {lendo === m.id ? "■ Parar" : "🔊 Ouvir"}
+                </button>
+              )}
+              {falhaVoz === m.id && <p className="mt-1 text-xs text-noite-50">Não consegui falar agora. Tente de novo em instantes.</p>}
               {!!m.refs?.length && (
                 <div className="mt-3 space-y-2">
                   {m.refs.map((r) => (

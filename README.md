@@ -46,6 +46,9 @@ npm test                        # usa TEST_DATABASE_URL (padrão: postgres://pos
 | `DATABASE_URL` | Conexão PostgreSQL (no Railway: `${{Postgres.DATABASE_URL}}`) |
 | `APP_ENV` | `producao` ou `demonstracao` |
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_PASSWORD` | Primeiro administrador, criado só se não houver nenhum. A senha é provisória e precisa ser trocada no primeiro acesso. Depois de entrar, remova `BOOTSTRAP_ADMIN_PASSWORD`. |
+| `OPENAI_API_KEY` (ou `ANTHROPIC_API_KEY`) | Respostas da Corujinha com IA e voz pela OpenAI |
+| `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` | Voz da Corujinha pela ElevenLabs (opcional; tem prioridade quando preenchida) |
+| `TTS_*`, `OPENAI_TTS_*`, `ELEVENLABS_*` | Ajustes da identidade vocal — veja `.env.example` e `docs/corujinha.md` |
 
 ## Implantação no Railway
 

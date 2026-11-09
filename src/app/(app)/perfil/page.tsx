@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Corujinha } from "@/components/Corujinha";
 import { PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { RELATION_LABEL, ROLE_LABEL } from "@/lib/format";
@@ -21,6 +23,14 @@ export default async function Perfil() {
           {me.pendingUnits.map((u) => <div key={u.id} className="text-sm text-noite-50">Apto {u.code} · aguardando aprovação</div>)}
         </Row>
       </div>
+      <Link href="/boas-vindas" className="card mt-6 flex items-center gap-4 p-5 transition hover:shadow-lg">
+        <Corujinha pose="ola" size={56} alt="" />
+        <div className="flex-1">
+          <p className="font-semibold">Rever a apresentação da Corujinha</p>
+          <p className="text-sm text-noite-50">Ela conta tudo o que dá para fazer no app</p>
+        </div>
+        <span className="text-xl text-noite-50">›</span>
+      </Link>
     </>
   );
 }

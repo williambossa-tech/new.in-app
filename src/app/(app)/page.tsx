@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Corujinha } from "@/components/Corujinha";
 import { requireUser } from "@/lib/auth";
-import { asUser } from "@/lib/db";
+import { asSystem, asUser } from "@/lib/db";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 
 const STATUS_TEXT: Record<string, string> = {
@@ -15,6 +16,8 @@ const STATUS_TEXT: Record<string, string> = {
 
 export default async function Inicio() {
   const me = await requireUser();
+  const seen = await asSystem((tx) => tx`select 1 from welcome_views where user_id = ${me.id}`);
+  if (!seen.length) redirect("/boas-vindas");
   const data = await asUser(me.id, async (tx) => {
     const campaigns = await tx`select code, title, status, registration_deadline_date, registration_deadline, draw_date, draw_at
                                from lottery_campaigns c where status <> 'cancelada' order by created_at desc`;

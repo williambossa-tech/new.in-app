@@ -6,7 +6,7 @@ export const LIMIT = 10;
 export const WINDOW_HOURS = 72;
 
 export type KbRef = { source: "regimento" | "convencao"; ref: string; title: string | null; body: string };
-export type Answer = { answer: string; refs: KbRef[]; mode: "ia" | "busca"; remaining: number; resetAt: string | null; limited?: boolean };
+export type Answer = { id?: string; answer: string; refs: KbRef[]; mode: "ia" | "busca"; remaining: number; resetAt: string | null; limited?: boolean };
 
 // Sinônimos do dia a dia → termos usados no Regimento e na Convenção
 const SYN: [RegExp, string][] = [
@@ -95,9 +95,9 @@ export async function askCorujinha(userId: string, unitId: string | null, questi
       if (ai && ai.resposta) {
         const used = ai.fontes.map((f) => { const [s, ...r] = f.split("|"); return refs.find((x) => x.source === s && x.ref === r.join("|")); })
           .filter((x): x is KbRef => !!x);
-        await tx`insert into kb_questions (user_id, unit_id, question, answer, refs, mode)
-                 values (${userId}, ${unitId}, ${q}, ${ai.resposta}, ${tx.json(used.map((r) => ({ source: r.source, ref: r.ref })) as never)}, 'ia')`;
-        return { answer: ai.resposta, refs: used, mode: "ia", remaining: u.remaining - 1, resetAt: u.remaining - 1 <= 0 ? new Date(Date.now() + WINDOW_HOURS * 3600_000).toISOString() : null };
+        const [row] = await tx`insert into kb_questions (user_id, unit_id, question, answer, refs, mode)
+                 values (${userId}, ${unitId}, ${q}, ${ai.resposta}, ${tx.json(used.map((r) => ({ source: r.source, ref: r.ref })) as never)}, 'ia') returning id`;
+        return { id: row.id as string, answer: ai.resposta, refs: used, mode: "ia", remaining: u.remaining - 1, resetAt: u.remaining - 1 <= 0 ? new Date(Date.now() + WINDOW_HOURS * 3600_000).toISOString() : null };
       }
     }
     // Busca direta no texto (sem custo), também usada quando o limite foi atingido
