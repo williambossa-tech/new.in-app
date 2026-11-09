@@ -19,8 +19,9 @@ export default async function Inicio() {
     const campaigns = await tx`select code, title, status, registration_deadline_date, registration_deadline, draw_date, draw_at
                                from lottery_campaigns c where status <> 'cancelada' order by created_at desc`;
     const bookings = await tx`select count(*)::int as n from bookings where status in ('solicitada','confirmada','em_uso') and upper(period) > now()`;
-    const [ab] = await tx`select status, value from parameters where key = 'bmg.abertura'`;
-    return { campaigns, upcoming: bookings[0].n as number, bmgOpen: ab?.status === "definido" && ab?.value?.ativo === true };
+    const ps = await tx`select key, status, value from parameters where key in ('bmg.abertura', 'cw.abertura')`;
+    const open = (k: string) => { const r = ps.find((x) => x.key === k); return r?.status === "definido" && r?.value?.ativo === true; };
+    return { campaigns, upcoming: bookings[0].n as number, bmgOpen: open("bmg.abertura"), cwOpen: open("cw.abertura") };
   });
   const firstName = me.fullName.split(" ")[0];
   const camp = data.campaigns[0];
@@ -63,7 +64,7 @@ export default async function Inicio() {
         <h2 className="mb-4 text-sm font-medium text-noite-50">Espaços</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <ModuleCard href="/be-my-guest" emoji="🛏️" title="Be My Guest" text="Suítes para seus convidados" soon={!data.bmgOpen} />
-          <ModuleCard href="/coworking" emoji="💼" title="Coworking" text="Sala de reuniões e mini sala" soon />
+          <ModuleCard href="/coworking" emoji="💼" title="Coworking" text="Sala de reuniões e mini sala" soon={!data.cwOpen} />
           <ModuleCard href="/minhas-reservas" emoji="📅" title="Minhas reservas"
             text={data.upcoming ? `${data.upcoming} ${data.upcoming === 1 ? "reserva futura" : "reservas futuras"}` : "Suas reservas em um só lugar"} />
         </div>

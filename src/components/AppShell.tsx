@@ -73,6 +73,7 @@ export function AdminTabs({ active }: { active: string }) {
     ["/admin/cadastros", "Cadastros"],
     ["/admin/sorteios/festas-2026", "Sorteio"],
     ["/admin/be-my-guest", "Be My Guest"],
+    ["/admin/coworking", "Coworking"],
     ["/admin/parametros", "Parâmetros"],
     ["/admin/auditoria", "Auditoria"],
   ];

@@ -59,5 +59,12 @@ export const ACTION_LABELS: Record<string, string> = {
   "bmg.ausencia": "Be My Guest: ausência",
   "bmg.excecao_horario": "Be My Guest: exceção de horário",
   "bmg.configuracao": "Be My Guest: configuração",
+  "taxa.cadastro": "Taxa cadastrada",
+  "cw.reserva": "Coworking: reserva",
+  "cw.excecao_pedido": "Coworking: pedido de exceção",
+  "cw.excecao_decisao": "Coworking: decisão de exceção",
+  "cw.cancelamento": "Coworking: cancelamento",
+  "cw.prorrogacao": "Coworking: prorrogação",
+  "cw.configuracao": "Coworking: configuração",
   "sorteio.revelar_reserva": "Período de desistências encerrado (chave reserva revelada)",
 };

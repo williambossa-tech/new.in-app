@@ -217,3 +217,15 @@ body {
 @keyframes cloud { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-46%, 0); } }
 .sad-cloud { animation: cloud 4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .sad-tear, .sad-rain, .sad-cloud { animation: none; } }
+
+/* Coworking: animações das salas */
+@keyframes screen-glow { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
+.cw-screen { animation: screen-glow 2.6s ease-in-out infinite; }
+@keyframes chart-draw { from { stroke-dasharray: 0 200; } to { stroke-dasharray: 200 0; } }
+.cw-chart { animation: chart-draw 2.4s ease-in-out infinite alternate; }
+@keyframes sway { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-4deg); } }
+.cw-plant { transform-origin: 10px 0; transform-box: fill-box; animation: sway 3s ease-in-out infinite; }
+@keyframes chair { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+.cw-chair { animation: chair 2.2s ease-in-out infinite; }
+.cw-dot { animation: twinkle 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .cw-screen, .cw-chart, .cw-plant, .cw-chair, .cw-dot { animation: none; } }
