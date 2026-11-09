@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { asUser, db } from "@/lib/db";
 import * as cw from "@/lib/cw/service";
+import { cwAdminData } from "@/lib/cw/queries";
 import { addDays, todayIso } from "@/lib/bmg/rules";
 import { mkUser } from "./helpers";
 
@@ -83,5 +84,13 @@ describe("Coworking", () => {
   it("outros moradores não veem convidados", async () => {
     const g = await asUser(u.c, (tx) => tx`select * from cw_guests`);
     expect(g).toHaveLength(0);
+  });
+
+  it("painel da administração e relatório semanal", async () => {
+    const d = await cwAdminData(admin, { from: day(0), to: day(6), day: day(0) });
+    expect(d.report.length).toBeGreaterThan(0);
+    const w702 = d.weekly.find((r) => r.unit === "702");
+    expect(w702?.convidados).toBe(8);
+    expect(Number(w702?.horas)).toBeGreaterThan(0);
   });
 });
