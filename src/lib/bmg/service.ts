@@ -1,5 +1,6 @@
 import "server-only";
 import { audit } from "../audit";
+import { computeFees } from "../fees";
 import { asSystem, asUser, type Tx } from "../db";
 import { RuleError } from "../lottery/engine";
 import { addDays, CHECKIN_HOUR, CHECKOUT_HOUR, CLEAN_HOURS, isValidCpf, onlyDigits, todayIso } from "./rules";
@@ -69,20 +70,25 @@ export async function requestBmg(actor: Actor, input: {
     const checkin = at(startDate, CHECKIN_HOUR);
     const checkout = at(endDate, CHECKOUT_HOUR);
     const cleanEnd = new Date(checkout.getTime() + CLEAN_HOURS * 3600_000);
+    const fees = await computeFees(tx, "bmg", startDate, nights);
+    // Confirmação automática quando todas as regras são atendidas (definição de 09/11/2026)
     const [b] = await tx`
-      insert into bookings (space_id, unit_id, responsible_user_id, responsible_name, kind, status, period, blocked, origin, created_by, fee_status)
-      values (${space.id}, ${unitId}, ${actor.id}, ${actor.label}, 'bmg', 'solicitada',
+      insert into bookings (space_id, unit_id, responsible_user_id, responsible_name, kind, status, period, blocked, origin, created_by,
+                            fee_status, fee_snapshot, fee_total)
+      values (${space.id}, ${unitId}, ${actor.id}, ${actor.label}, 'bmg', 'confirmada',
               tstzrange(${checkin}, ${checkout}, '[)'), tstzrange(${checkin}, ${cleanEnd}, '[)'),
-              ${role.admin ? "admin" : "app"}, ${actor.id}, 'pendente_definicao')
+              ${role.admin ? "admin" : "app"}, ${actor.id}, ${fees.missing.length ? "pendente_definicao" : "prevista"},
+              ${tx.json(fees as never)}, ${fees.missing.length ? null : fees.total})
       returning id, code`;
-    await tx`insert into bmg_details (booking_id, start_date, end_date, requested_by, terms_version, terms_accepted_at)
-             values (${b.id}, ${startDate}, ${endDate}, ${actor.id}, ${terms.v}, now())`;
+    await tx`insert into bmg_details (booking_id, start_date, end_date, requested_by, terms_version, terms_accepted_at, decided_at, decision_note)
+             values (${b.id}, ${startDate}, ${endDate}, ${actor.id}, ${terms.v}, now(), now(), 'Confirmação automática')`;
     for (const g of guests) {
       await tx`insert into bmg_guests (booking_id, full_name, cpf, is_minor) values (${b.id}, ${g.name}, ${g.cpf}, ${g.minor})`;
     }
     await tx`insert into bmg_operations (booking_id) values (${b.id})`;
     await audit(tx, { actorId: actor.id, actorLabel: actor.label, action: "bmg.solicitacao", entity: "booking", entityId: b.code,
-      data: { quarto: space.name, apartamento: unit.code, entrada: startDate, saida: endDate, diarias: nights, hospedes: guests.length, termo_versao: terms.v } });
+      data: { quarto: space.name, apartamento: unit.code, entrada: startDate, saida: endDate, diarias: nights, hospedes: guests.length,
+              termo_versao: terms.v, confirmacao: "automática", valores: fees } });
     return { id: b.id as string, code: b.code as string };
   }, actor.id);
 }
@@ -104,16 +110,15 @@ export async function cancelBmg(actor: Actor, bookingId: string, reason: string)
   return asSystem(async (tx) => {
     const role = await roleOf(tx);
     const b = await loadForUpdate(tx, bookingId);
-    if (!role.admin) {
-      const [m] = await tx`select 1 from unit_memberships where user_id = ${actor.id} and unit_id = ${b.unit_id} and status = 'ativo'`;
-      if (!m) throw new RuleError("Reserva não encontrada.");
-      if (Date.now() >= at(new Date(b.start_date).toISOString().slice(0, 10), CHECKIN_HOUR).getTime())
-        throw new RuleError("A reserva já começou. Fale com a administração.");
-    } else if (reason.trim().length < 5) throw new RuleError("Informe o motivo do cancelamento.");
+    const [member] = await tx`select 1 from unit_memberships where user_id = ${actor.id} and unit_id = ${b.unit_id} and status = 'ativo'`;
+    if (!member && !role.admin) throw new RuleError("Reserva não encontrada.");
     if (!["solicitada", "confirmada"].includes(b.status)) throw new RuleError("Esta reserva não pode mais ser cancelada.");
-    const why = role.admin ? reason.trim() : "Cancelada pelo morador";
+    if (!role.admin && Date.now() >= at(new Date(b.start_date).toISOString().slice(0, 10), CHECKIN_HOUR).getTime())
+      throw new RuleError("A reserva já começou. Fale com a administração.");
+    if (reason.trim().length < 5) throw new RuleError("Informe o motivo do cancelamento.");
+    const why = `${member ? "Cancelada pelo morador" : "Cancelada pela administração"}: ${reason.trim()}`;
     await tx`update bookings set status = 'cancelada', cancelled_at = now(), cancel_reason = ${why} where id = ${bookingId}`;
-    await log(tx, actor, "bmg.cancelamento", b, { motivo: why });
+    await log(tx, actor, "bmg.cancelamento", b, { motivo: reason.trim(), por: member ? "morador" : "administração" });
   }, actor.id);
 }
 
@@ -261,4 +266,18 @@ export async function bmgAvailability(userId: string, from: string, to: string) 
 
 function overlaps(rg: { lo: number; hi: number }, a: number, b: number) {
   return rg.lo < b && rg.hi > a;
+}
+
+export async function addFee(actor: Actor, input: { module: string; component: string; amount: number; basis: string; validFrom: string; source: string }) {
+  return asSystem(async (tx) => {
+    const role = await roleOf(tx);
+    if (!role.admin) throw new RuleError("Somente a administração.");
+    if (!(input.amount >= 0)) throw new RuleError("Informe um valor válido.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.validFrom)) throw new RuleError("Informe a data de início da vigência.");
+    if (input.source.trim().length < 5) throw new RuleError("Informe a deliberação que aprovou o valor (ex.: AGE de 15/11/2026).");
+    await tx`insert into fee_schedules (module, component, amount, basis, valid_from, source, created_by)
+             values (${input.module}, ${input.component}, ${input.amount}, ${input.basis}, ${input.validFrom}, ${input.source.trim()}, ${actor.id})`;
+    await audit(tx, { actorId: actor.id, actorLabel: actor.label, action: "taxa.cadastro", entity: "fee_schedule", entityId: `${input.module}.${input.component}`,
+      data: { valor: input.amount, base: input.basis, vigencia: input.validFrom, fonte: input.source.trim() } });
+  }, actor.id);
 }

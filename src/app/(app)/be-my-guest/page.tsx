@@ -56,7 +56,7 @@ export default async function BeMyGuest() {
 
       {active ? (
         <section className="card relative overflow-hidden p-7 sm:p-9">
-          <Corujinha pose={active.status === "solicitada" ? "dica" : "festa"} size={110} className="owl-bob absolute -bottom-2 right-4 hidden sm:block" alt="" />
+          <Corujinha pose={active.status === "solicitada" ? "dica" : "festa"} size={96} className="owl-bob absolute right-6 top-6 hidden sm:block" alt="" />
           <p className="text-sm font-medium text-violeta">
             {active.status === "solicitada" ? "Aguardando confirmação" : active.status === "confirmada" ? "Reserva confirmada" : "Hospedagem em andamento"}
           </p>
@@ -67,7 +67,10 @@ export default async function BeMyGuest() {
             <div><p className="text-sm text-noite-50">Diárias</p><p className="font-semibold">{active.nights}</p></div>
           </div>
           <p className="mt-4 text-sm text-noite-70">Hóspedes: {(active.guests as string[]).join(" e ")}</p>
-          {["solicitada", "confirmada"].includes(active.status) && <div className="mt-4"><CancelBmg id={active.id} /></div>}
+          <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2">
+            <a href={`/minhas-reservas/${active.code}`} className="btn-secondary btn-sm">Ver detalhes e comprovante</a>
+            {["solicitada", "confirmada"].includes(active.status) && <CancelBmg id={active.id} />}
+          </div>
         </section>
       ) : eligibleUnits.length === 0 ? (
         <section className="card flex items-center gap-5 p-7">

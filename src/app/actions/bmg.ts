@@ -34,7 +34,7 @@ export async function solicitarBmgAction(_: ActionState, f: FormData): Promise<A
       accepted: f.get("accept") === "on",
     });
     refresh();
-    return { ok: true, message: "Solicitação enviada.", data: { code: r.code } };
+    return { ok: true, message: "Reserva confirmada.", data: { code: r.code } };
   } catch (e) {
     return { message: errMsg(e) };
   }
@@ -120,5 +120,19 @@ export async function configBmgAction(_: ActionState, f: FormData): Promise<Acti
     });
     refresh();
     return { ok: true, message: "Configuração salva." };
+  } catch (e) { return { message: errMsg(e) }; }
+}
+
+export async function taxaAction(_: ActionState, f: FormData): Promise<ActionState> {
+  const me = await requireRole("admin");
+  try {
+    await bmg.addFee({ id: me.id, label: me.fullName }, {
+      module: String(f.get("module") ?? "bmg"), component: String(f.get("component")),
+      amount: Number(String(f.get("amount") ?? "").replace(/\./g, "").replace(",", ".")),
+      basis: String(f.get("basis")), validFrom: String(f.get("valid_from") ?? ""), source: String(f.get("source") ?? ""),
+    });
+    refresh();
+    revalidatePath("/admin/parametros");
+    return { ok: true, message: "Valor cadastrado. Vale para reservas feitas a partir de agora com entrada na vigência." };
   } catch (e) { return { message: errMsg(e) }; }
 }

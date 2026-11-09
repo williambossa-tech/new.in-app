@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { BookingBadge, Empty } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { asUser } from "@/lib/db";
@@ -49,7 +50,10 @@ export default async function MinhasReservas() {
                   <p className="mt-0.5 text-sm text-noite-50">
                     {dm(r.ini)} a {dm(last)} · Apto {r.unit}{r.origin === "sorteio" ? " · Sorteio de fim de ano" : ""}
                   </p>
-                  {canWithdraw && <div className="mt-3"><Desistir campaign={r.campaign_code} stageId={r.lottery_stage_id} unit={r.unit} /></div>}
+                  <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <Link href={`/minhas-reservas/${r.code}`} className="text-sm font-medium text-violeta-700">Ver detalhes e comprovante ›</Link>
+                    {canWithdraw && <Desistir campaign={r.campaign_code} stageId={r.lottery_stage_id} unit={r.unit} />}
+                  </div>
                 </div>
               </div>
             );

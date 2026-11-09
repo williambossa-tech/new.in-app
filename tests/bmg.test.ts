@@ -31,10 +31,16 @@ beforeAll(async () => {
 });
 
 describe("Be My Guest", () => {
-  it("fica fechado até a administração definir a antecedência e abrir", async () => {
+  it("taxas: valores com vigência ficam congelados na reserva", async () => {
+    await bmg.addFee(A(), { module: "bmg", component: "taxa_uso", amount: 80, basis: "por_diaria", validFrom: "2026-01-01", source: "AGE teste" });
+    await bmg.addFee(A(), { module: "bmg", component: "taxa_limpeza", amount: 60, basis: "por_reserva", validFrom: "2026-01-01", source: "AGE teste" });
+    await expect(db()`update fee_schedules set amount = 1`).rejects.toThrow(/nova data de vigência/);
+  });
+
+  it("fechado para moradores quando a administração fecha; reabre com antecedência definida", async () => {
+    await bmg.setBmgSettings(A(), { advanceHours: null, open: false, source: "teste de configuração" });
     await expect(bmg.requestBmg(me("p401"), { spaceCode: "bmg-1", unitId: await unitId("401"), startDate: D(3), endDate: D(5), guests: [G("Ana Souza", "123456789")], accepted: true }))
       .rejects.toThrow(/não estão abertas/);
-    await expect(bmg.setBmgSettings(A(), { advanceHours: null, open: true, source: "teste de configuração" })).rejects.toThrow(/antecedência/);
     await bmg.setBmgSettings(A(), { advanceHours: 24, open: true, source: "teste de configuração" });
   });
 
@@ -52,8 +58,16 @@ describe("Be My Guest", () => {
       .rejects.toThrow(/proprietário ou locatário/);
   });
 
-  it("uma reserva ativa por unidade, mesmo com outra conta do apartamento", async () => {
-    await bmg.requestBmg(me("p401"), { spaceCode: "bmg-1", unitId: await unitId("401"), startDate: D(3), endDate: D(8), guests: [G("Ana Souza", "123456789")], accepted: true });
+  it("uma reserva ativa por unidade, mesmo com outra conta do apartamento; confirmação automática com valores", async () => {
+    const r = await bmg.requestBmg(me("p401"), { spaceCode: "bmg-1", unitId: await unitId("401"), startDate: D(3), endDate: D(8), guests: [G("Ana Souza", "123456789")], accepted: true });
+    const [b] = await db()`select status, fee_total, fee_status, fee_snapshot from bookings where code = ${r.code}`;
+    expect(b.status).toBe("confirmada");
+    expect(Number(b.fee_total)).toBeNull;
+    expect(b.fee_status).toBe("pendente_definicao"); // falta o fundo de manutenção
+    expect(b.fee_snapshot.lines.map((l: { subtotal: number }) => l.subtotal)).toEqual([60, 400]);
+    await bmg.addFee(A(), { module: "bmg", component: "taxa_uso", amount: 999, basis: "por_diaria", validFrom: "2026-01-02", source: "Nova AGE teste" });
+    const [b2] = await db()`select fee_snapshot from bookings where code = ${r.code}`;
+    expect(b2.fee_snapshot.lines.find((l: { component: string }) => l.component === "taxa_uso").amount).toBe(80);
     await expect(bmg.requestBmg(me("l401"), { spaceCode: "bmg-2", unitId: await unitId("401"), startDate: D(15), endDate: D(16), guests: [G("Ana Souza", "123456789")], accepted: true }))
       .rejects.toMatchObject({ constraint_name: "bookings_bmg_one_active_per_unit" });
   });
@@ -85,8 +99,7 @@ describe("Be My Guest", () => {
   });
 
   it("no máximo 7 diárias por unidade em 30 dias", async () => {
-    const [b] = await db()`select b.id from bookings b join units u on u.id = b.unit_id where u.code = '401' and b.kind = 'bmg' and b.status = 'solicitada'`;
-    await bmg.decideBmg(A(), b.id, "confirmar", "");
+    const [b] = await db()`select b.id from bookings b join units u on u.id = b.unit_id where u.code = '401' and b.kind = 'bmg' and b.status = 'confirmada'`;
     await bmg.checkInBmg(me("portaria"), b.id, { inspectionOk: true, inspectionNote: "", tagCode: "T-01" });
     await bmg.checkOutBmg(me("portaria"), b.id, { tagReturned: "nao_devolvida", note: "Hóspede levou a tag" });
     // já usou 5 diárias: mais 3 dentro de 30 dias excede

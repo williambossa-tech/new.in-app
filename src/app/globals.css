@@ -208,3 +208,12 @@ body {
 @keyframes bubble-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 .typing-bubble { animation: bubble-float 3s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .typing-dot, .owl-work, .steam, .laptop-logo, .typing-bubble { animation: none; } }
+
+/* Corujinha triste */
+@keyframes tear { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translateY(28px); opacity: 0; } }
+.sad-tear { animation: tear 2.4s ease-in infinite; }
+@keyframes rain { 0% { transform: translateY(-2px); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(3px); opacity: 0; } }
+.sad-rain { animation: rain 1.2s linear infinite; }
+@keyframes cloud { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-46%, 0); } }
+.sad-cloud { animation: cloud 4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .sad-tear, .sad-rain, .sad-cloud { animation: none; } }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  ausenciaBmgAction, configBmgAction, decidirBmgAction, entradaBmgAction, excecaoBmgAction, ocorrenciaBmgAction, saidaBmgAction,
+  ausenciaBmgAction, configBmgAction, taxaAction, decidirBmgAction, entradaBmgAction, excecaoBmgAction, ocorrenciaBmgAction, saidaBmgAction,
 } from "@/app/actions/bmg";
 import { AdminTabs } from "@/components/AppShell";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -8,6 +8,7 @@ import { BookingBadge, Empty, Stat } from "@/components/ui";
 import { requireRole } from "@/lib/auth";
 import { addDays, formatCpf, todayIso } from "@/lib/bmg/rules";
 import { bmgAdminData } from "@/lib/bmg/queries";
+import { bmgCharts, bmgStats, STATUS_LABEL } from "@/lib/bmg/report";
 import { bmgSettings } from "@/lib/bmg/service";
 import { asUser } from "@/lib/db";
 import { fmtDateTime } from "@/lib/format";
@@ -26,7 +27,10 @@ export default async function AdminBmg({ searchParams }: { searchParams: Promise
   const from = sp.de ?? addDays(todayIso(), -30);
   const to = sp.ate ?? addDays(todayIso(), 30);
   const data = await bmgAdminData(me.id, { from, to, room: sp.quarto, status: sp.situacao });
-  const settings = await asUser(me.id, (tx) => bmgSettings(tx));
+  const { settings, fees } = await asUser(me.id, async (tx) => ({
+    settings: await bmgSettings(tx),
+    fees: await tx`select component, amount, basis, valid_from, source from fee_schedules where module = 'bmg' order by component, valid_from desc`,
+  }));
   const tabs = admin
     ? [["agenda", "Agenda"], ["solicitacoes", `Solicitações${data.pending.length ? ` (${data.pending.length})` : ""}`], ["hoje", "Entradas e saídas"],
        ["relatorio", "Relatório"], ["config", "Configuração"]]
@@ -60,22 +64,51 @@ export default async function AdminBmg({ searchParams }: { searchParams: Promise
       {aba === "hoje" && <Hoje ops={data.ops} occurrences={data.occurrences} admin={admin} />}
       {aba === "relatorio" && <Relatorio rows={data.report} rooms={data.rooms} f={{ from, to, room: sp.quarto ?? "", status: sp.situacao ?? "" }} />}
       {aba === "config" && (
-        <section className="card max-w-xl p-7">
-          <h2 className="h2">Configuração</h2>
-          <ActionForm action={configBmgAction} className="mt-5 space-y-4">
-            <div>
-              <label className="field-label">Antecedência mínima (horas antes da entrada às 18h)</label>
-              <input className="input w-40" name="advance_hours" type="number" min={0} max={1440} defaultValue={settings.advanceHours ?? ""} />
-              <p className="field-hint">Regimento 27.7(a). Ex.: 48 = pedir até as 18h de dois dias antes.</p>
-            </div>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" name="open" defaultChecked={settings.open} className="h-5 w-5 accent-violeta" />
-              <span>Reservas abertas para os moradores</span>
-            </label>
-            <input className="input" name="source" placeholder="Fonte da definição (ex.: decisão do síndico de 10/11/2026)" required />
-            <SubmitButton>Salvar</SubmitButton>
-          </ActionForm>
-        </section>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className="card p-7">
+            <h2 className="h2">Abertura e antecedência</h2>
+            <ActionForm action={configBmgAction} className="mt-5 space-y-4">
+              <div>
+                <label className="field-label">Antecedência mínima (horas antes da entrada às 18h)</label>
+                <input className="input w-40" name="advance_hours" type="number" min={0} max={1440} defaultValue={settings.advanceHours ?? ""} />
+              </div>
+              <label className="flex items-center gap-3">
+                <input type="checkbox" name="open" defaultChecked={settings.open} className="h-5 w-5 accent-violeta" />
+                <span>Reservas abertas para os moradores</span>
+              </label>
+              <input className="input" name="source" placeholder="Fonte da definição" required />
+              <SubmitButton>Salvar</SubmitButton>
+            </ActionForm>
+          </section>
+          <section className="card p-7">
+            <h2 className="h2">Taxas (Regimento 27.17)</h2>
+            <p className="mt-1 text-sm text-noite-50">Cada reserva guarda os valores vigentes no momento da contratação. Para mudar um valor, cadastre um novo com nova vigência.</p>
+            <table className="tbl mt-4">
+              <thead><tr><th>Componente</th><th>Valor</th><th>Base</th><th>Vigência</th></tr></thead>
+              <tbody>
+                {["taxa_uso", "taxa_limpeza", "fundo_manutencao"].map((c) => {
+                  const cur = fees.filter((x) => x.component === c);
+                  const label = { taxa_uso: "Taxa de uso", taxa_limpeza: "Taxa de limpeza", fundo_manutencao: "Fundo de manutenção" }[c];
+                  return cur.length ? cur.map((x, i) => (
+                    <tr key={c + i} className={i ? "text-noite-50" : ""}><td>{i ? "" : label}</td>
+                      <td>{Number(x.amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
+                      <td>{x.basis === "por_diaria" ? "por diária" : "por reserva"}</td>
+                      <td title={x.source}>desde {new Date(x.valid_from).toISOString().slice(0, 10).split("-").reverse().join("/")}</td></tr>
+                  )) : <tr key={c}><td>{label}</td><td colSpan={3}><span className="badge-amarelo">Pendente de assembleia</span></td></tr>;
+                })}
+              </tbody>
+            </table>
+            <ActionForm action={taxaAction} className="mt-5 grid gap-3 sm:grid-cols-2" resetOnSuccess>
+              <input type="hidden" name="module" value="bmg" />
+              <select className="input" name="component" required><option value="taxa_uso">Taxa de uso</option><option value="taxa_limpeza">Taxa de limpeza</option><option value="fundo_manutencao">Fundo de manutenção</option></select>
+              <input className="input" name="amount" inputMode="decimal" placeholder="Valor (R$)" required />
+              <select className="input" name="basis" required><option value="por_diaria">por diária</option><option value="por_reserva">por reserva</option></select>
+              <input className="input" name="valid_from" type="date" required />
+              <input className="input sm:col-span-2" name="source" placeholder="Deliberação que aprovou (ex.: AGE de 15/11/2026, item 4)" required />
+              <div><SubmitButton className="btn-secondary btn-sm">Cadastrar valor</SubmitButton></div>
+            </ActionForm>
+          </section>
+        </div>
       )}
     </>
   );
@@ -273,9 +306,12 @@ function Hoje({ ops, occurrences, admin }: { ops: Row[]; occurrences: Row[]; adm
 }
 
 function Relatorio({ rows, rooms, f }: { rows: Row[]; rooms: Row[]; f: { from: string; to: string; room: string; status: string } }) {
-  const counted = rows.filter((r) => ["confirmada", "em_uso", "concluida"].includes(r.status));
-  const nights = counted.reduce((n, r) => n + r.nights, 0);
+  const rs = rooms.filter((r) => !f.room || r.code === f.room).map((r) => ({ code: r.code as string, name: r.name as string }));
+  const stats = bmgStats(rows, rs, f.from, f.to);
+  const charts = bmgCharts(stats, rs);
+  const k = stats.kpis;
   const qs = new URLSearchParams({ de: f.from, ate: f.to, quarto: f.room, situacao: f.status }).toString();
+  const svg = (s: string) => <div className="card overflow-hidden p-2 [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: s }} />;
   return (
     <div className="space-y-6">
       <form className="no-print card grid gap-3 p-5 sm:grid-cols-5 sm:items-end">
@@ -286,20 +322,49 @@ function Relatorio({ rows, rooms, f }: { rows: Row[]; rooms: Row[]; f: { from: s
           <select className="input" name="quarto" defaultValue={f.room}><option value="">Todas</option>{rooms.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}</select></div>
         <div><label className="field-label">Situação</label>
           <select className="input" name="situacao" defaultValue={f.status}><option value="">Todas</option>
-            {["solicitada", "confirmada", "em_uso", "concluida", "cancelada", "recusada", "ausencia"].map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}</select></div>
+            {Object.entries(STATUS_LABEL).map(([s, l]) => <option key={s} value={s}>{l}</option>)}</select></div>
         <button className="btn-secondary">Filtrar</button>
       </form>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Reservas no período" value={rows.length} />
-        <Stat label="Confirmadas/realizadas" value={counted.length} />
-        <Stat label="Diárias" value={nights} />
-        <Stat label="Ocorrências de tag" value={rows.filter((r) => ["pendente_validacao", "validada"].includes(r.occurrence_status)).length} />
+      <div className="no-print flex flex-wrap gap-2">
+        <a className="btn-primary btn-sm" href={`/api/admin/bmg/relatorio?${qs}&formato=xlsx`}>Exportar Excel (.xlsx)</a>
+        <a className="btn-secondary btn-sm" href={`/api/admin/bmg/relatorio?${qs}&formato=pdf`} target="_blank">Exportar PDF</a>
+        <a className="btn-ghost btn-sm" href={`/api/admin/bmg/relatorio?${qs}&formato=csv`}>CSV</a>
       </div>
-      <div className="no-print flex gap-2">
-        <a className="btn-secondary btn-sm" href={`/api/admin/bmg/relatorio?${qs}`}>Exportar Excel (CSV)</a>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Stat label="Reservas no período" value={k.bookings} />
+        <Stat label="Diárias utilizadas" value={k.nights} />
+        <Stat label="Ocupação média" value={`${String(k.occupancy).replace(".", ",")}%`} />
+        <Stat label="Média de diárias" value={String(k.avgNights).replace(".", ",")} />
+        <Stat label="Apartamentos atendidos" value={k.units} />
+        <Stat label="Antecedência média" value={`${String(k.avgLead).replace(".", ",")} dias`} />
+        <Stat label="Cancelamentos" value={`${String(k.cancelRate).replace(".", ",")}%`} />
+        <Stat label="Ausências" value={k.absences} />
+        <Stat label="Ocorrências de tag" value={k.occurrences} />
+        <Stat label="Dias no período" value={k.periodDays} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {svg(charts.occupancy)}
+        {svg(charts.status)}
+      </div>
+      {svg(charts.monthly)}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {svg(charts.units)}
+        <section className="card p-2 sm:p-5">
+          <h2 className="h2 px-3 pt-2">Por apartamento</h2>
+          <div className="table-wrap mt-2">
+            <table className="tbl">
+              <thead><tr><th>Apto</th><th>Reservas</th><th>Diárias</th><th>Cancel.</th><th>Ausências</th><th>Última entrada</th></tr></thead>
+              <tbody>{stats.byUnit.map((u) => (
+                <tr key={u.unit}><td className="font-semibold">{u.unit}</td><td>{u.bookings}</td><td>{u.nights}</td><td>{u.cancelled}</td><td>{u.absences}</td>
+                  <td>{u.lastStart ? u.lastStart.split("-").reverse().join("/") : "—"}</td></tr>))}</tbody>
+            </table>
+            {!stats.byUnit.length && <Empty title="Sem reservas no período" />}
+          </div>
+        </section>
       </div>
       <section className="card p-2 sm:p-5">
-        <div className="table-wrap">
+        <h2 className="h2 px-3 pt-2">Reservas</h2>
+        <div className="table-wrap mt-2">
           <table className="tbl">
             <thead><tr><th>Reserva</th><th>Suíte</th><th>Apto</th><th>Responsável</th><th>Entrada</th><th>Saída</th><th>Diárias</th><th>Hóspedes</th><th>Situação</th><th>Tag</th></tr></thead>
             <tbody>

@@ -80,10 +80,10 @@ export function BmgPlanner(props: Props) {
     return (
       <div className="card flex flex-col items-center px-8 py-14 text-center">
         <div className="check-pop grid h-16 w-16 place-items-center rounded-full bg-verde text-3xl text-white">✓</div>
-        <h2 className="h1 mt-5">Solicitação enviada</h2>
+        <h2 className="h1 mt-5">Reserva confirmada</h2>
         <p className="mt-2 max-w-sm text-noite-70">
           {props.rooms.find((r) => r.code === room)?.name} · {start && longDay(start)} a {end && longDay(end)}.
-          Você recebe a confirmação aqui no aplicativo.
+          O comprovante fica em Minhas reservas.
         </p>
         <Corujinha pose="festa" size={120} className="mt-6 owl-bob" alt="" />
       </div>
@@ -236,7 +236,7 @@ export function BmgPlanner(props: Props) {
           </div>
 
           <div className="mt-7 space-y-3">
-            <SubmitButton className="btn-primary w-full sm:w-auto sm:px-10" pendingText="Enviando…">Solicitar reserva</SubmitButton>
+            <SubmitButton className="btn-primary w-full sm:w-auto sm:px-10" pendingText="Reservando…">Reservar</SubmitButton>
             {!guestsOk && <p className="text-xs text-noite-50">Preencha nome completo e CPF válido de cada hóspede.</p>}
             <FormMessage state={state} />
           </div>
