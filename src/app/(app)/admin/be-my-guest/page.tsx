@@ -20,8 +20,8 @@ const dm = (d: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day:
 const iso = (d: Date) => new Date(d).toISOString().slice(0, 10);
 
 export default async function AdminBmg({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const me = await requireRole("admin", "portaria");
-  const admin = me.roles.includes("admin");
+  const me = await requireRole("admin", "portaria", "sindico", "conselheiro");
+  const admin = me.roles.includes("admin") || me.roles.includes("sindico") || me.roles.includes("conselheiro");
   const sp = await searchParams;
   const aba = admin ? sp.aba ?? "agenda" : "hoje";
   const from = sp.de ?? addDays(todayIso(), -30);

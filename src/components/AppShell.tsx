@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { SessionUser } from "@/lib/auth";
-import { currentEnv } from "@/lib/db";
+import { asUser, currentEnv } from "@/lib/db";
 import { FloatingOwl } from "./FloatingOwl";
 import { BottomNav, TopNav, type NavItem } from "./NavLinks";
 
@@ -23,6 +23,7 @@ export async function AppShell({ user, children, wide = false }: { user: Session
     { href: "/minhas-reservas", label: "Reservas", icon: "📅" },
   ];
   const admin = user.roles.includes("admin");
+  const [{ n: unread }] = await asUser(user.id, (tx) => tx`select count(*)::int as n from notifications where user_id = ${user.id} and read_at is null`);
   const firstName = user.fullName.split(" ")[0];
   return (
     <div className="min-h-dvh pb-24 lg:pb-10">
@@ -38,11 +39,19 @@ export async function AppShell({ user, children, wide = false }: { user: Session
             <Link href="/admin" className="rounded-full bg-amarelo px-4 py-2 text-sm font-semibold text-noite hover:brightness-95">
               Administração
             </Link>
+          ) : user.roles.includes("sindico") || user.roles.includes("conselheiro") ? (
+            <Link href="/admin" className="rounded-full bg-amarelo px-4 py-2 text-sm font-semibold text-noite hover:brightness-95">
+              {user.roles.includes("sindico") ? "Síndico" : "Conselho"}
+            </Link>
           ) : user.roles.includes("portaria") ? (
             <Link href="/admin/be-my-guest" className="rounded-full bg-amarelo px-4 py-2 text-sm font-semibold text-noite hover:brightness-95">
               Portaria
             </Link>
           ) : null}
+          <Link href="/avisos" aria-label={unread ? `Avisos: ${unread} novos` : "Avisos"} className="relative grid h-10 w-10 place-items-center rounded-full bg-white/15 text-lg hover:bg-white/25">
+            <span aria-hidden>🔔</span>
+            {unread > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-coral px-1 text-[11px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
+          </Link>
           <details className="relative">
             <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full bg-white/15 px-3 py-2 text-sm font-bold hover:bg-white/25">
               <span className="grid h-7 w-7 place-items-center rounded-full bg-white text-violeta-700">{firstName[0]?.toUpperCase()}</span>
@@ -76,6 +85,8 @@ export function AdminTabs({ active }: { active: string }) {
     ["/admin/sorteios/festas-2026", "Sorteio"],
     ["/admin/be-my-guest", "Be My Guest"],
     ["/admin/coworking", "Coworking"],
+    ["/admin/quadras", "Quadras"],
+    ["/admin/piscina", "Piscina"],
     ["/admin/parametros", "Parâmetros"],
     ["/admin/auditoria", "Auditoria"],
   ];

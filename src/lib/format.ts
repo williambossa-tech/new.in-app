@@ -50,7 +50,9 @@ export const RELATION_LABEL: Record<string, string> = {
 
 export const ROLE_LABEL: Record<string, string> = {
   morador: "Morador",
-  admin: "Administração/síndico",
+  admin: "Administração",
+  sindico: "Síndico",
+  conselheiro: "Conselheiro",
   portaria: "Portaria/zeladoria",
   administradora: "Administradora",
 };

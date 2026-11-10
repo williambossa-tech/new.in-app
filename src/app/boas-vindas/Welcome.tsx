@@ -24,7 +24,7 @@ export function Welcome({ firstName, falas }: { firstName: string; falas: Fala[]
   // preferência de narração (por aparelho)
   useEffect(() => {
     try { if (localStorage.getItem("newin-narracao") === "off") setVoz(false); } catch { /* sem armazenamento */ }
-    document.getElementById("splash")?.remove();
+    { const s = document.getElementById("splash"); if (s) s.style.display = "none"; }
   }, []);
 
   // pré-carrega todas as falas (o servidor gera uma vez e guarda)

@@ -8,7 +8,7 @@ import { asUser } from "@/lib/db";
 export const metadata = { title: "Administração" };
 
 export default async function AdminHome() {
-  const me = await requireRole("admin");
+  const me = await requireRole("admin", "sindico", "conselheiro");
   const d = await asUser(me.id, async (tx) => {
     const [a] = await tx`select
       (select count(*)::int from users where status = 'pendente') + (select count(*)::int from unit_memberships m join users u on u.id = m.user_id where m.status = 'solicitado' and u.status = 'ativo') as pendentes,

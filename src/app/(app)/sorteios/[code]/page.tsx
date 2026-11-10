@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { OwlRules } from "@/components/OwlRules";
+import { REGRAS } from "@/lib/voice/falas";
 import { notFound } from "next/navigation";
 import { Corujinha } from "@/components/Corujinha";
 import { SimpleMarkdown } from "@/components/ui";
@@ -59,7 +61,9 @@ export default async function SorteioPage({ params }: { params: Promise<{ code: 
             </div>
           </div>
         </div>
-        <Corujinha pose={c.status === "concluida" ? "festa" : "pergunta"} size={150} className="owl-bob absolute -bottom-2 right-6 hidden sm:block" alt="" />
+        <OwlRules falaId={REGRAS.sorteio.id} texto={REGRAS.sorteio.texto} titulo="Como funciona o sorteio" className="absolute -bottom-2 right-2 z-20 hidden sm:right-6 sm:block">
+          <Corujinha pose={c.status === "concluida" ? "festa" : "pergunta"} size={150} className="owl-bob" alt="" />
+        </OwlRules>
       </section>
 
       {official.length > 0 && (

@@ -19,7 +19,7 @@ const STEP = ["rascunho", "inscricoes_abertas", "inscricoes_encerradas", "congel
 export default async function AdminSorteio({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<{ todas?: string }> }) {
   const { code } = await params;
   const { todas } = await searchParams;
-  const me = await requireRole("admin");
+  const me = await requireRole("admin", "sindico", "conselheiro");
   const v = await loadCampaign(me.id, code);
   if (!v) notFound();
   const { campaign: c, periods, venues, rounds, stages, counts, params: pend } = v;

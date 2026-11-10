@@ -11,7 +11,7 @@ export const metadata = { title: "Parâmetros" };
 const MODULES: Record<string, string> = { geral: "Geral", sorteio: "Sorteio dos salões", bmg: "Be My Guest", coworking: "Coworking" };
 
 export default async function Parametros() {
-  const me = await requireRole("admin");
+  const me = await requireRole("admin", "sindico", "conselheiro");
   const rows = await asUser(me.id, (tx) => tx`
     select p.*, u.full_name as updated_by_name from parameters p left join users u on u.id = p.updated_by order by module, key`);
   return (

@@ -10,18 +10,19 @@ const fmt = (d: Date, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(
 const dayNum = (d: Date) => fmt(d, { day: "2-digit" });
 const mon = (d: Date) => fmt(d, { month: "short" }).replace(".", "");
 const dm = (d: Date) => fmt(d, { day: "2-digit", month: "2-digit" });
+const hm = (d: Date) => fmt(d, { hour: "2-digit", minute: "2-digit" });
 
 export default async function MinhasReservas() {
   const me = await requireUser();
   const rows = await asUser(me.id, (tx) => tx`
     select b.code, b.status, b.kind, b.origin, lower(b.period) as ini, upper(b.period) as fim, b.lottery_stage_id,
-           s.name as space, u.code as unit, b.responsible_name,
+           s.name as space, s.code as space_code, u.code as unit, b.responsible_name,
            c.code as campaign_code, c.status as campaign_status, r.reserve_revealed
     from bookings b join spaces s on s.id = b.space_id join units u on u.id = b.unit_id
     left join lottery_stages x on x.id = b.lottery_stage_id
     left join lottery_campaigns c on c.id = x.campaign_id
     left join lottery_rounds r on r.campaign_id = x.campaign_id and r.round = x.round
-    where b.status not in ('cancelada', 'recusada')
+    where b.status not in ('cancelada', 'recusada') and upper(b.period) > now() - interval '1 day'
     order by lower(b.period)`);
   return (
     <div className="space-y-8">
@@ -48,10 +49,12 @@ export default async function MinhasReservas() {
                     <BookingBadge status={r.status} />
                   </div>
                   <p className="mt-0.5 text-sm text-noite-50">
-                    {dm(r.ini)} a {dm(last)} · Apto {r.unit}{r.origin === "sorteio" ? " · Sorteio de fim de ano" : ""}
+                    {r.kind === "quadra" || r.kind === "coworking" ? `${dm(r.ini)} · ${hm(r.ini)}–${hm(r.fim)}` : `${dm(r.ini)} a ${dm(last)}`} · Apto {r.unit}{r.origin === "sorteio" ? " · Sorteio de fim de ano" : ""}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
-                    <Link href={`/minhas-reservas/${r.code}`} className="text-sm font-medium text-violeta-700">Ver detalhes e comprovante ›</Link>
+                    {r.kind === "quadra"
+                      ? <Link href={`/quadras/${r.space_code === "quadra-areia" ? "areia" : "poli"}#meus`} className="text-sm font-medium text-violeta-700">Ver agendamento ›</Link>
+                      : <Link href={`/minhas-reservas/${r.code}`} className="text-sm font-medium text-violeta-700">Ver detalhes e comprovante ›</Link>}
                     {canWithdraw && <Desistir campaign={r.campaign_code} stageId={r.lottery_stage_id} unit={r.unit} />}
                   </div>
                 </div>

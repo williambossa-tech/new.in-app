@@ -59,7 +59,7 @@ export function AiStatus({ s, voz }: { s: AiState; voz: Voz }) {
             </>)}
           </ActionForm>
           <ActionForm action={prepararFalasAction} className="">
-            <SubmitButton className="btn-secondary btn-sm" pendingText="Preparando…">Preparar apresentação</SubmitButton>
+            <SubmitButton className="btn-secondary btn-sm" pendingText="Preparando…">Preparar falas (apresentação e regras)</SubmitButton>
           </ActionForm>
         </div>
       </div>

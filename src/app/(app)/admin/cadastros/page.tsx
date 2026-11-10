@@ -9,7 +9,7 @@ import { fmtDate, fmtDateTime, RELATION_LABEL, ROLE_LABEL } from "@/lib/format";
 export const metadata = { title: "Cadastros" };
 
 export default async function Cadastros({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const me = await requireRole("admin");
+  const me = await requireRole("admin", "sindico", "conselheiro");
   const { q = "" } = await searchParams;
   const d = await asUser(me.id, async (tx) => {
     const pending = await tx`

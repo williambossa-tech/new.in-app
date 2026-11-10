@@ -18,7 +18,7 @@ export default async function CorujinhaPage() {
         <h1 className="h1">Pergunte à Corujinha</h1>
       </div>
       <Chat firstName={me.fullName.split(" ")[0]} remaining={s.remaining} limit={LIMIT} aiOn={!!aiConfig()} vozOn={!!voiceConfig().provider} />
-      {me.roles.includes("admin") && <AiStatus s={aiState()} voz={voiceStatus()} />}
+      {me.roles.includes("desenvolvedor") && <AiStatus s={aiState()} voz={voiceStatus()} />}
     </div>
   );
 }

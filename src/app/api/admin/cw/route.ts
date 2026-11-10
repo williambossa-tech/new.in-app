@@ -6,7 +6,7 @@ import { fmtDateTime } from "@/lib/format";
 
 export async function GET(req: Request) {
   const me = await getSessionUser();
-  if (!me || me.status !== "ativo" || !me.roles.includes("admin")) return new Response("Acesso negado", { status: 403 });
+  if (!me || me.status !== "ativo" || !["admin", "sindico", "conselheiro"].some((r) => me.roles.includes(r as never))) return new Response("Acesso negado", { status: 403 });
   const u = new URL(req.url);
   const from = u.searchParams.get("de") || addDays(todayIso(), -30);
   const to = u.searchParams.get("ate") || addDays(todayIso(), 14);

@@ -1,4 +1,6 @@
 import { ComingSoon } from "@/components/ComingSoon";
+import { OwlRules } from "@/components/OwlRules";
+import { REGRAS } from "@/lib/voice/falas";
 import { Corujinha } from "@/components/Corujinha";
 import { BookingBadge } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
@@ -46,12 +48,14 @@ export default async function BeMyGuest() {
         </p>
       )}
       <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-violeta to-violeta-700 px-7 py-9 text-white sm:px-10 sm:py-12">
-        <div className="relative z-10 sm:max-w-[62%]">
+        <div className="relative z-10 pr-20 sm:max-w-[62%] sm:pr-0">
           <p className="text-sm font-medium text-white/75">Suítes para convidados</p>
           <h1 className="mt-1 text-[1.8rem] font-semibold leading-tight tracking-[-0.02em] sm:text-[2.2rem]">Be My Guest</h1>
           <p className="mt-3 text-white/85">Entrada a partir das 18h · saída até as 12h · até 2 hóspedes · até 7 diárias</p>
         </div>
-        <Corujinha pose="descanso" size={150} className="owl-bob absolute -bottom-2 right-6 hidden sm:block" alt="" />
+        <OwlRules falaId={REGRAS["be-my-guest"].id} texto={REGRAS["be-my-guest"].texto} titulo="Regras do Be My Guest" className="absolute -bottom-2 right-2 z-20 sm:right-6">
+          <Corujinha pose="descanso" size={150} className="owl-bob h-[96px]! w-[96px]! sm:h-[150px]! sm:w-[150px]!" alt="" />
+        </OwlRules>
       </section>
 
       {active ? (

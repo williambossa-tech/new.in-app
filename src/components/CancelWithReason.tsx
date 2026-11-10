@@ -1,7 +1,7 @@
 "use client";
 import { useActionState, useState } from "react";
 import type { ActionState } from "@/lib/action";
-import { FormMessage, SubmitButton } from "./forms";
+import { FormMessage, SubmitButton, useReadOnly } from "./forms";
 import { SadOwl } from "./SadOwl";
 
 export function CancelWithReason({ id, action, label = "Cancelar reserva", hint = "O espaço fica livre para outros moradores." }: {
@@ -9,6 +9,8 @@ export function CancelWithReason({ id, action, label = "Cancelar reserva", hint 
 }) {
   const [state, act] = useActionState(action, {});
   const [open, setOpen] = useState(false);
+  const ro = useReadOnly();
+  if (ro) return null;
   if (!open) return <button type="button" onClick={() => setOpen(true)} className="btn-ghost btn-sm px-0 text-noite-50 hover:text-[#c23a2b]">{label}</button>;
   return (
     <form action={act} className="w-full rounded-2xl bg-fundo p-5 ring-1 ring-linha">

@@ -9,6 +9,8 @@ export type Loaded = { url: string; track: LipTrack | null; duration: number; pi
 export type PlayResult = "ended" | "blocked" | "stopped" | "error";
 
 const cache = new Map<string, Promise<Loaded>>();
+// 0,05 s de silêncio (WAV) para liberar o áudio no primeiro toque
+const SILENCE = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
 
 export const falaUrl = (id: string) => `/api/voz/fala/${encodeURIComponent(id)}`;
 
@@ -70,6 +72,16 @@ export class SpeechPlayer {
       this.finish = resolve;
       this.audio.play().catch((e: Error) => { this.current = null; this.finish = null; resolve(e?.name === "NotAllowedError" ? "blocked" : "error"); });
     });
+  }
+
+  /** Libera o áudio no celular: precisa ser chamado direto no toque do usuário. */
+  unlock() {
+    try {
+      const a = this.audio;
+      if (a.src && !a.paused) return;
+      a.src = SILENCE; a.volume = 0;
+      const p = a.play(); p?.then(() => { if (a.src === SILENCE) a.pause(); }).catch(() => {});
+    } catch { /* sem áudio */ }
   }
 
   stop() {

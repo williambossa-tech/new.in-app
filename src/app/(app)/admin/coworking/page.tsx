@@ -16,7 +16,7 @@ const hm = (d: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sa
 const dm = (d: Date | string) => new Date(d).toISOString().slice(0, 10).split("-").reverse().slice(0, 2).join("/");
 
 export default async function AdminCw({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const me = await requireRole("admin");
+  const me = await requireRole("admin", "sindico", "conselheiro");
   const sp = await searchParams;
   const aba = sp.aba ?? "agenda";
   const day = sp.dia ?? todayIso();

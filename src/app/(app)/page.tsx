@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { OwlVideo } from "@/components/OwlVideo";
+import { SportsCards } from "@/components/SportsCards";
 import { requireUser } from "@/lib/auth";
 import { asSystem, asUser } from "@/lib/db";
 import { fmtDate, fmtDateTime } from "@/lib/format";
@@ -71,6 +72,11 @@ export default async function Inicio() {
           <ModuleCard href="/minhas-reservas" emoji="📅" title="Minhas reservas"
             text={data.upcoming ? `${data.upcoming} ${data.upcoming === 1 ? "reserva futura" : "reservas futuras"}` : "Suas reservas em um só lugar"} />
         </div>
+      </section>
+
+      <section id="esportes">
+        <h2 className="mb-4 text-sm font-medium text-noite-50">Esportes e lazer</h2>
+        <SportsCards />
       </section>
     </div>
   );

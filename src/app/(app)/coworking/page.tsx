@@ -1,4 +1,6 @@
 import { cancelarCwAction, prorrogarCwAction } from "@/app/actions/cw";
+import { OwlRules } from "@/components/OwlRules";
+import { REGRAS } from "@/lib/voice/falas";
 import { CancelWithReason } from "@/components/CancelWithReason";
 import { ComingSoon } from "@/components/ComingSoon";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -44,12 +46,14 @@ export default async function Coworking() {
   return (
     <div className="space-y-10">
       <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-turquesa to-[#0e8c80] px-7 py-9 text-white sm:px-10 sm:py-12">
-        <div className="relative z-10 sm:max-w-[60%]">
+        <div className="relative z-10 pr-24 sm:max-w-[60%] sm:pr-0">
           <p className="text-sm font-medium text-white/80">Trabalhe e receba seus convidados</p>
           <h1 className="mt-1 text-[1.8rem] font-semibold leading-tight tracking-[-0.02em] sm:text-[2.2rem]">Coworking</h1>
           <p className="mt-3 text-white/90">24 horas · até 2h por reserva · 1 reserva por dia</p>
         </div>
-        <div className="absolute -bottom-3 right-4 hidden sm:block"><OwlAtWork size={190} /></div>
+        <OwlRules falaId={REGRAS.coworking.id} texto={REGRAS.coworking.texto} titulo="Regras do coworking" className="absolute -bottom-3 right-0 z-20 sm:right-4">
+          <span className="block origin-bottom-right scale-[0.6] sm:scale-100"><OwlAtWork size={190} /></span>
+        </OwlRules>
       </section>
 
       {mine.filter((b) => +new Date(b.fim) > Date.now()).length > 0 && (

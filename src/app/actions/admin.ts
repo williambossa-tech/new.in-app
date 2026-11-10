@@ -93,7 +93,7 @@ export async function redefinirSenhaAction(_: ActionState, f: FormData): Promise
   } catch (e) { return fail(friendlyDbError(e)); }
 }
 
-const ROLES: Role[] = ["morador", "admin", "portaria", "administradora"];
+const ROLES: Role[] = ["morador", "admin", "sindico", "conselheiro", "portaria", "administradora"];
 
 export async function perfisAction(_: ActionState, f: FormData): Promise<ActionState> {
   const me = await requireRole("admin");
@@ -103,7 +103,7 @@ export async function perfisAction(_: ActionState, f: FormData): Promise<ActionS
   try {
     await asUser(me.id, async (tx) => {
       const before = (await tx`select role from user_roles where user_id = ${userId}`).map((r) => r.role as string);
-      for (const r of before.filter((r) => !roles.includes(r as Role))) await tx`delete from user_roles where user_id = ${userId} and role = ${r}`;
+      for (const r of before.filter((r) => ROLES.includes(r as Role) && !roles.includes(r as Role))) await tx`delete from user_roles where user_id = ${userId} and role = ${r}`;
       for (const r of roles.filter((r) => !before.includes(r))) await tx`insert into user_roles (user_id, role, granted_by) values (${userId}, ${r}, ${me.id})`;
       await audit(tx, { actorId: me.id, actorLabel: me.fullName, action: "admin.perfil", entity: "user", entityId: userId, data: { antes: before, depois: roles } });
     });

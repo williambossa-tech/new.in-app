@@ -9,7 +9,9 @@ const scrypt = promisify(_scrypt) as (pw: string, salt: Buffer, len: number, opt
 const COOKIE = "newin_sessao";
 const SESSION_DAYS = 30;
 
-export type Role = "morador" | "admin" | "portaria" | "administradora";
+export type Role = "morador" | "admin" | "portaria" | "administradora" | "sindico" | "conselheiro" | "desenvolvedor";
+/** Perfis que veem a área da administração (síndico e conselheiros só visualizam). */
+export const VIEW_ROLES: Role[] = ["admin", "sindico", "conselheiro"];
 
 export type SessionUser = {
   id: string;
@@ -131,6 +133,10 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
 }
 
 export const isAdmin = (u: SessionUser | null) => !!u?.roles.includes("admin");
+export const canView = (u: SessionUser | null) => !!u && VIEW_ROLES.some((r) => u.roles.includes(r));
+/** Síndico/conselheiro sem perfil de administração: somente visualização. */
+export const viewOnly = (u: SessionUser | null) => canView(u) && !u!.roles.includes("admin") && !u!.roles.includes("portaria");
+export const isDev = (u: SessionUser | null) => !!u?.roles.includes("desenvolvedor");
 
 // Limite simples de tentativas de login por e-mail (memória do processo).
 const attempts = new Map<string, { n: number; until: number }>();

@@ -8,7 +8,7 @@ import { fmtDateTimeSec, shortHash } from "@/lib/format";
 export const metadata = { title: "Auditoria" };
 
 export default async function Auditoria({ searchParams }: { searchParams: Promise<{ tipo?: string }> }) {
-  const me = await requireRole("admin");
+  const me = await requireRole("admin", "sindico", "conselheiro");
   const { tipo = "" } = await searchParams;
   const d = await asUser(me.id, async (tx) => {
     const [v] = await tx`select * from app.audit_verify()`;

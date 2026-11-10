@@ -1,16 +1,25 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { createContext, useActionState, useContext, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import type { ActionState } from "@/lib/action";
 
+/** Somente visualização (síndico e conselheiros): botões de ação ficam desativados. */
+const ReadOnly = createContext(false);
+export function ReadOnlyProvider({ value, children }: { value: boolean; children: React.ReactNode }) {
+  return <ReadOnly.Provider value={value}>{children}</ReadOnly.Provider>;
+}
+export const useReadOnly = () => useContext(ReadOnly);
+
 export function SubmitButton({ children, className = "btn-primary", pendingText = "Aguarde…", confirm }: { children: React.ReactNode; className?: string; pendingText?: string; confirm?: string }) {
   const { pending } = useFormStatus();
+  const ro = useReadOnly();
   return (
     <button
       type="submit"
-      className={className}
-      disabled={pending}
+      className={`${className} ${ro ? "cursor-not-allowed opacity-45" : ""}`}
+      disabled={pending || ro}
+      title={ro ? "Somente visualização" : undefined}
       onClick={(e) => {
         if (confirm && !window.confirm(confirm)) e.preventDefault();
       }}
@@ -49,9 +58,10 @@ export function ActionForm({
   useEffect(() => {
     if (state.ok && resetOnSuccess) ref.current?.reset();
   }, [state, resetOnSuccess]);
+  const ro = useReadOnly();
   return (
     <form ref={ref} action={formAction} className={className}>
-      {typeof children === "function" ? children(state) : children}
+      <fieldset disabled={ro} className="contents">{typeof children === "function" ? children(state) : children}</fieldset>
       <FormMessage state={state} />
     </form>
   );
