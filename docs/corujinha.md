@@ -38,7 +38,7 @@ Cadastre as variáveis no Railway (Variables). As chaves ficam só no servidor; 
 2. Copie o *Voice ID* e gere uma API Key.
 3. Preencha `ELEVENLABS_API_KEY` e `ELEVENLABS_VOICE_ID`. Com as duas, o app passa a usar a ElevenLabs automaticamente (`TTS_PROVIDER=auto`).
 
-**Ajustes comuns a qualquer provedor:** `TTS_SPEED` (0,7–1,3), `TTS_EXPRESSIVIDADE` (0–1), `TTS_VOLUME` (0–1), `TTS_ESTILO` (descrição da personagem). Qualquer mudança na configuração gera áudios novos — nunca mistura vozes.
+**Ajustes comuns a qualquer provedor:** `TTS_TOM` (tom da personagem na reprodução: 1 = original, padrão 1,12 = mais aguda e infantil, sem efeito metálico), `TTS_SPEED` (0,7–1,3; padrão 0,9 para compensar o tom), `TTS_EXPRESSIVIDADE` (0–1), `TTS_VOLUME` (0–1), `TTS_ESTILO` (descrição da personagem). Qualquer mudança na configuração gera áudios novos — nunca mistura vozes.
 
 ## Como funciona
 

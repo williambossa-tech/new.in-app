@@ -8,11 +8,12 @@ import "server-only";
 
 export type VoiceProvider = "openai" | "elevenlabs";
 
-export const PERSONA = `Você é a voz da Corujinha, mascote do Condomínio NEW.IN: uma personagem de animação familiar.
-Voz feminina, doce, aveludada e levemente aguda; alegre sem exagero, acolhedora e carinhosa; com um sorriso na voz.
-Português do Brasil com pronúncia natural e sotaque neutro.
-Ritmo agradável, com pausas naturais nas vírgulas e entre as frases; entonação variada e expressiva, nunca monótona.
-Nada de tom robótico, de GPS ou de atendimento telefônico; não infantilize a voz e não fique estridente.
+export const PERSONA = `Você é a voz da Corujinha, mascote do Condomínio NEW.IN: uma corujinha pequena de desenho animado infantil.
+Voz feminina bem fofa, doce e meiga, aguda e infantil, como a de uma personagem criança de animação: encantadora, risonha e cheia de carinho.
+Fala com alegria e um sorriso na voz, com entonação cantada e brincalhona de personagem de desenho, sem gritar e sem ficar estridente.
+Português do Brasil com pronúncia natural e clara, sotaque neutro.
+Ritmo tranquilo e gostoso de ouvir, com pausas naturais nas vírgulas e entre as frases; entonação bem variada e expressiva, nunca monótona.
+Nada de tom robótico, metálico, de GPS ou de atendimento telefônico.
 Leia exatamente o texto, sem acrescentar nem omitir palavras.`;
 
 const num = (v: string | undefined, d: number, min: number, max: number) => {
@@ -39,7 +40,10 @@ export function voiceConfig() {
   return {
     provider,
     language: "pt-BR",
-    speed: num(process.env.TTS_SPEED, 1.0, 0.7, 1.3),
+    speed: num(process.env.TTS_SPEED, 0.9, 0.7, 1.3),
+    /** tom aplicado na reprodução (1 = original; 1.12 ≈ dois semitons acima, voz mais infantil).
+     *  Sobe como “fita acelerada”, sem o efeito metálico; a velocidade é compensada em TTS_SPEED. */
+    pitch: num(process.env.TTS_TOM, 1.12, 0.85, 1.35),
     /** volume padrão sugerido ao componente (0–1) */
     volume: num(process.env.TTS_VOLUME, 0.9, 0, 1),
     /** intensidade expressiva 0–1 (ElevenLabs: style; OpenAI: reforço nas instruções) */

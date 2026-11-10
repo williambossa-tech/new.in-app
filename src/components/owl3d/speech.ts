@@ -5,7 +5,7 @@
  */
 import { analyzeAudio, type LipTrack } from "./lipsync";
 
-export type Loaded = { url: string; track: LipTrack | null; duration: number };
+export type Loaded = { url: string; track: LipTrack | null; duration: number; pitch: number };
 export type PlayResult = "ended" | "blocked" | "stopped" | "error";
 
 const cache = new Map<string, Promise<Loaded>>();
@@ -28,7 +28,8 @@ export function loadSpeech(src: string, init?: RequestInit): Promise<Loaded> {
       const blob = new Blob([buf], { type: res.headers.get("content-type") ?? "audio/mpeg" });
       let track: LipTrack | null = null;
       try { track = await analyzeAudio(buf); } catch { track = null; }
-      return { url: URL.createObjectURL(blob), track, duration: track?.duration ?? 0 };
+      const pitch = Math.min(1.35, Math.max(0.85, Number(res.headers.get("x-voz-tom")) || 1));
+      return { url: URL.createObjectURL(blob), track, duration: track?.duration ?? 0, pitch };
     })();
     p.catch(() => cache.delete(key));
     cache.set(key, p);
@@ -58,7 +59,12 @@ export class SpeechPlayer {
     this.stop();
     this.current = l;
     this.audio.src = l.url;
-    this.audio.playbackRate = opts.rate ?? 1;
+    // tom da personagem: acelera a reprodução sem preservar o tom (sem efeito metálico)
+    const a = this.audio as HTMLAudioElement & { webkitPreservesPitch?: boolean; mozPreservesPitch?: boolean };
+    const keep = l.pitch === 1;
+    a.preservesPitch = keep; a.webkitPreservesPitch = keep; a.mozPreservesPitch = keep;
+    this.audio.defaultPlaybackRate = (opts.rate ?? 1) * l.pitch;
+    this.audio.playbackRate = (opts.rate ?? 1) * l.pitch;
     this.audio.volume = Math.min(1, Math.max(0, opts.volume ?? 0.9));
     return new Promise<PlayResult>((resolve) => {
       this.finish = resolve;

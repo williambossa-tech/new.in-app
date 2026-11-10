@@ -142,6 +142,7 @@ export function audioResponse(s: Speech) {
       "cache-control": "private, max-age=604800",
       etag: `"${s.hash.slice(0, 32)}"`,
       "x-voz-cache": s.cached ? "hit" : "miss",
+      "x-voz-tom": String(voiceConfig().pitch),
     },
   });
 }
