@@ -2,6 +2,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { OwlVideo } from "@/components/OwlVideo";
+import { SpaceCard, SpaceGrid } from "@/components/SpaceCard";
+import { CalendarArt, DeskArt, SuiteArt } from "@/components/SportsArt";
 import { SportsCards } from "@/components/SportsCards";
 import { AUTHOR_LABEL, listPosts, type AuthorRole } from "@/lib/mural/service";
 import { requireUser } from "@/lib/auth";
@@ -90,12 +92,15 @@ export default async function Inicio() {
 
       <section>
         <h2 className="mb-4 text-sm font-medium text-noite-50">Espaços</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <ModuleCard href="/be-my-guest" emoji="🛏️" title="Be My Guest" text="Suítes para seus convidados" soon={!data.bmgOpen} />
-          <ModuleCard href="/coworking" emoji="💼" title="Coworking" text="Sala de reuniões e mini sala" soon={!data.cwOpen} />
-          <ModuleCard href="/minhas-reservas" emoji="📅" title="Minhas reservas"
-            text={data.upcoming ? `${data.upcoming} ${data.upcoming === 1 ? "reserva futura" : "reservas futuras"}` : "Suas reservas em um só lugar"} />
-        </div>
+        <SpaceGrid>
+          <SpaceCard title="Be My Guest" info="Suítes para seus convidados" art={<SuiteArt className="block w-full" />} href="/be-my-guest"
+            primary={["Reservar", "/be-my-guest"]} secondary={["Minhas reservas", "/minhas-reservas"]} badge={data.bmgOpen ? undefined : "Em breve"} />
+          <SpaceCard title="Coworking" info="Sala de reuniões e mini sala · 24 horas" art={<DeskArt className="block w-full" />} href="/coworking"
+            primary={["Reservar", "/coworking"]} secondary={["Minhas reservas", "/minhas-reservas"]} badge={data.cwOpen ? undefined : "Em breve"} />
+          <SpaceCard title="Minhas reservas" art={<CalendarArt className="block w-full" />} href="/minhas-reservas"
+            info={data.upcoming ? `${data.upcoming} ${data.upcoming === 1 ? "reserva futura" : "reservas futuras"}` : "Suas reservas em um só lugar"}
+            primary={["Ver reservas", "/minhas-reservas"]} />
+        </SpaceGrid>
       </section>
 
       <section id="esportes">
@@ -103,18 +108,5 @@ export default async function Inicio() {
         <SportsCards />
       </section>
     </div>
-  );
-}
-
-function ModuleCard({ href, emoji, title, text, soon }: { href: string; emoji: string; title: string; text: string; soon?: boolean }) {
-  return (
-    <Link href={href} className="card block p-6 transition hover:shadow-lg">
-      <div className="flex items-start justify-between">
-        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-violeta-50 text-xl">{emoji}</span>
-        {soon && <span className="text-xs font-medium text-noite-50">Em breve</span>}
-      </div>
-      <p className="mt-5 font-semibold">{title}</p>
-      <p className="mt-0.5 text-sm text-noite-50">{text}</p>
-    </Link>
   );
 }
