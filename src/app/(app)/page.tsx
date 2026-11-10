@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Corujinha } from "@/components/Corujinha";
+import { OwlVideo } from "@/components/OwlVideo";
 import { requireUser } from "@/lib/auth";
 import { asSystem, asUser } from "@/lib/db";
 import { fmtDate, fmtDateTime } from "@/lib/format";
@@ -41,7 +41,7 @@ export default async function Inicio() {
             {me.units.length ? <>Apartamento {me.units.map((u) => u.code).join(" · ")}</> : <>Bem-vindo à comunidade NEW.IN</>}
           </p>
         </div>
-        <Corujinha pose="ola" size={160} className="owl-bob absolute -bottom-2 right-3 sm:right-10" alt="" />
+        <OwlVideo size={160} className="absolute -bottom-2 right-3 sm:right-10" />
       </section>
 
       {camp && (
