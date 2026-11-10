@@ -34,3 +34,15 @@ Sino no topo (`notifications`): agendamento solicitado/confirmado, pendente de a
 
 ## Corujinha das regras
 Tocar na coruja de cada módulo (Be My Guest, Coworking, Quadras, Piscina, Sorteio) faz a Corujinha falar as regras do espaço, com o texto em balão (`REGRAS` em `src/lib/voice/falas.ts`).
+
+## Mural de avisos
+- Publicam: Síndico (como “Síndico”), conselheiros (como “Conselho”) e a Administração. Moradores leem.
+- Aviso: título, texto (negrito e listas), categoria, fixar no topo, “mostrar até”, anexo (PDF ou imagem até 5 MB, guardado no banco e entregue só a usuários logados) e opção de avisar todos no sino.
+- Marcação “Novo” por pessoa; autor e administração veem quantas pessoas e apartamentos leram.
+- Editar: o autor, outro usuário com o mesmo perfil de publicação, ou a Administração. Arquivar com motivo. Tudo na auditoria.
+
+## Apresentação antes do login
+`/intro` aparece antes da tela de entrar: “Ouvir a Corujinha”, “Pular” (só desta vez) ou “Não mostrar mais” (cookie de 1 ano). Quem já viu neste aparelho não vê de novo a apresentação após o login.
+
+## Corujinhas temáticas
+Quadra Poliesportiva: uniforme da seleção (amarelo, gola e punhos verdes, calção azul, “BRASIL 10”; sem escudos) fazendo embaixadinha de cabeça. Quadra de Areia: viseira e raquete de beach tennis. Piscina: touca, óculos e boia. Ao tocar, ela fala as regras.

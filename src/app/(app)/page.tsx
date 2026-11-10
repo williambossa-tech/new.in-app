@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { OwlVideo } from "@/components/OwlVideo";
 import { SportsCards } from "@/components/SportsCards";
+import { AUTHOR_LABEL, listPosts, type AuthorRole } from "@/lib/mural/service";
 import { requireUser } from "@/lib/auth";
 import { asSystem, asUser } from "@/lib/db";
 import { fmtDate, fmtDateTime } from "@/lib/format";
@@ -18,7 +20,10 @@ const STATUS_TEXT: Record<string, string> = {
 export default async function Inicio() {
   const me = await requireUser();
   const seen = await asSystem((tx) => tx`select 1 from welcome_views where user_id = ${me.id}`);
-  if (!seen.length) redirect("/boas-vindas");
+  if (!seen.length) {
+    if ((await cookies()).get("newin_intro")) await asSystem((tx) => tx`insert into welcome_views (user_id) values (${me.id}) on conflict do nothing`);
+    else redirect("/boas-vindas");
+  }
   const data = await asUser(me.id, async (tx) => {
     const campaigns = await tx`select code, title, status, registration_deadline_date, registration_deadline, draw_date, draw_at
                                from lottery_campaigns c where status <> 'cancelada' order by created_at desc`;
@@ -27,6 +32,7 @@ export default async function Inicio() {
     const open = (k: string) => { const r = ps.find((x) => x.key === k); return r?.status === "definido" && r?.value?.ativo === true; };
     return { campaigns, upcoming: bookings[0].n as number, bmgOpen: open("bmg.abertura"), cwOpen: open("cw.abertura") };
   });
+  const avisos = (await listPosts(me.id, { limit: 3 }));
   const firstName = me.fullName.split(" ")[0];
   const camp = data.campaigns[0];
   const hour = Number(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false }).format(new Date()));
@@ -44,6 +50,24 @@ export default async function Inicio() {
         </div>
         <OwlVideo size={160} className="absolute -bottom-2 right-3 sm:right-10" />
       </section>
+
+      {avisos.length > 0 && (
+        <section>
+          <div className="mb-4 flex items-center justify-between"><h2 className="text-sm font-medium text-noite-50">Mural de avisos</h2><Link href="/mural" className="text-sm font-medium text-violeta-700">Ver todos ›</Link></div>
+          <div className="space-y-3">
+            {avisos.map((p) => (
+              <Link key={p.id} href={`/mural/${p.id}`} className={`card flex items-center gap-4 p-5 transition hover:shadow-lg ${p.pinned ? "ring-2 ring-amarelo" : ""}`}>
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violeta-50 text-xl">{p.pinned ? "📌" : "📢"}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-violeta-700">{AUTHOR_LABEL[p.author_role as AuthorRole]}</p>
+                  <p className={`truncate ${p.lido ? "font-medium" : "font-semibold"}`}>{p.title}</p>
+                </div>
+                {!p.lido && <span className="rounded-full bg-violeta px-2 py-0.5 text-[11px] font-semibold text-white">Novo</span>}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {camp && (
         <section>

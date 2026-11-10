@@ -17,6 +17,7 @@ export async function EnvBanner() {
 export async function AppShell({ user, children, wide = false }: { user: SessionUser; children: React.ReactNode; wide?: boolean }) {
   const items: NavItem[] = [
     { href: "/", label: "Início", icon: "🏠" },
+    { href: "/mural", label: "Mural", icon: "📢" },
     { href: "/be-my-guest", label: "Be My Guest", icon: "🛏️" },
     { href: "/coworking", label: "Coworking", icon: "💼" },
     { href: "/sorteios", label: "Sorteio", icon: "🎄" },

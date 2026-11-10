@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   deploymentId: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.RAILWAY_DEPLOYMENT_ID || undefined,
   serverExternalPackages: ["pdfkit", "postgres", "exceljs", "@resvg/resvg-js"],
   poweredByHeader: false,
+  // anexos do mural (até 5 MB)
+  experimental: { serverActions: { bodySizeLimit: "6mb" } },
   async headers() {
     return [
       {

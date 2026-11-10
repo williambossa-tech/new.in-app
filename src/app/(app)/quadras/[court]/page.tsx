@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cancelarQuadraAction } from "@/app/actions/quadras";
 import { CancelWithReason } from "@/components/CancelWithReason";
-import { Corujinha } from "@/components/Corujinha";
+import { CondominioOwl } from "@/components/CondominioOwl";
 import { OwlRules } from "@/components/OwlRules";
 import { CourtArt } from "@/components/SportsArt";
 import { requireUser } from "@/lib/auth";
@@ -65,7 +65,7 @@ export default async function Quadra({ params, searchParams }: { params: Promise
         </div>
         <CourtArt kind={court} className="pointer-events-none absolute -right-10 bottom-0 hidden w-72 opacity-90 sm:block" />
         <OwlRules falaId={REGRAS.quadras.id} texto={REGRAS.quadras.texto} titulo={`Regras da ${name.toLowerCase().replace("quadra", "quadra")}`} className="absolute -bottom-2 right-2 z-20 sm:right-48">
-          <Corujinha pose="aponta" size={120} className="owl-bob h-[92px]! w-[92px]! sm:h-[120px]! sm:w-[120px]!" alt="" />
+          <CondominioOwl outfit={court === "poli" ? "selecao" : "beachtennis"} estado="happy" entrada={false} ariaLabel="Corujinha" className={court === "poli" ? "h-[132px] w-[104px] sm:h-[200px] sm:w-[160px]" : "h-[112px] w-[118px] sm:h-[170px] sm:w-[180px]"} />
         </OwlRules>
       </section>
 

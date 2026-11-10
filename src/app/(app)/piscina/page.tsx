@@ -1,6 +1,6 @@
 import { cancelarConvidadoAction } from "@/app/actions/piscina";
 import { CancelWithReason } from "@/components/CancelWithReason";
-import { Corujinha } from "@/components/Corujinha";
+import { CondominioOwl } from "@/components/CondominioOwl";
 import { OwlRules } from "@/components/OwlRules";
 import { PoolArt } from "@/components/SportsArt";
 import { requireUser } from "@/lib/auth";
@@ -36,7 +36,7 @@ export default async function Piscina({ searchParams }: { searchParams: Promise<
         </div>
         <PoolArt className="pointer-events-none absolute -right-10 bottom-0 hidden w-72 opacity-90 sm:block" />
         <OwlRules falaId={REGRAS.piscina.id} texto={REGRAS.piscina.texto} titulo="Regras da piscina" className="absolute -bottom-2 right-2 z-20 sm:right-48">
-          <Corujinha pose="ola" size={120} className="owl-bob h-[92px]! w-[92px]! sm:h-[120px]! sm:w-[120px]!" alt="" />
+          <CondominioOwl outfit="nadadora" estado="happy" entrada={false} ariaLabel="Corujinha nadadora" className="h-[112px] w-[112px] sm:h-[170px] sm:w-[170px]" />
         </OwlRules>
       </section>
 

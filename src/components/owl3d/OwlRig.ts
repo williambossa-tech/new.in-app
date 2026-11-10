@@ -11,6 +11,8 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 export type OwlState = "idle" | "greeting" | "talking" | "happy" | "thinking" | "listening" | "goodbye";
 export type OwlExpression = "neutral" | "happy" | "surprised" | "sad" | "curious";
 export type Mouth = { open: number; wide: number; round: number };
+/** Roupas temáticas dos espaços esportivos. */
+export type Outfit = "selecao" | "beachtennis" | "nadadora";
 
 const C = {
   body: "#6652f2", bodyTop: "#8b7bff", bodyBottom: "#4a35dc", sheen: "#a99cff",
@@ -88,6 +90,8 @@ export class OwlRig {
   private wings: { pivot: THREE.Group; side: 1 | -1 }[] = [];
   private tufts: THREE.Mesh[] = []; private cheeks: THREE.Mesh[] = []; private shadow!: THREE.Mesh;
   private disposables: { dispose(): void }[] = [];
+  private scarfParts: THREE.Object3D[] = []; private bellyParts: THREE.Object3D[] = []; private leaves: THREE.Object3D[] = [];
+  private outfit: Outfit | null = null; private ball: THREE.Mesh | null = null; private paddle: THREE.Group | null = null; private ring: THREE.Mesh | null = null;
 
   private state: OwlState = "idle"; private expression: OwlExpression = "neutral";
   private cur: Targets = { ...BASE }; private mouth: Mouth = { open: 0, wide: 0, round: 0 }; private mouthCur: Mouth = { open: 0, wide: 0, round: 0 };
@@ -95,7 +99,7 @@ export class OwlRig {
   private entrance = 1; private t = 0; private nextBlink = 2; private blink = 0; private stateTime = 0;
   private raf = 0; private last = 0; private running = false; private visible = true;
 
-  constructor(private canvas: HTMLCanvasElement, opts: { quality?: "alta" | "leve" } = {}) {
+  constructor(private canvas: HTMLCanvasElement, opts: { quality?: "alta" | "leve"; outfit?: Outfit } = {}) {
     const leve = opts.quality === "leve";
     this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: !leve, powerPreference: leve ? "low-power" : "default" });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, leve ? 1.25 : 2));
@@ -115,6 +119,7 @@ export class OwlRig {
 
     this.camera.position.set(0, 0.15, 7.2); this.camera.lookAt(0, -0.05, 0);
     this.build();
+    if (opts.outfit) this.dress(opts.outfit);
     this.scene.add(this.root);
   }
 
@@ -132,7 +137,7 @@ export class OwlRig {
 
     // Barriguinha creme com penas douradas
     const bellyMat = this.mat({ color: C.belly, roughness: 0.7, sheen: 0.4, sheenColor: new THREE.Color("#fff3e0"), sheenRoughness: 0.6, emissive: new THREE.Color("#ffe8cc"), emissiveIntensity: 0.12 });
-    const belly = this.mesh(new THREE.SphereGeometry(0.74, 64, 48), bellyMat); belly.position.set(0, -0.42, 0.36); belly.scale.set(1, 0.82, 0.78); this.root.add(belly);
+    const belly = this.mesh(new THREE.SphereGeometry(0.74, 64, 48), bellyMat); belly.position.set(0, -0.42, 0.36); belly.scale.set(1, 0.82, 0.78); this.root.add(belly); this.bellyParts.push(belly);
     const markMat = this.mat({ color: C.mark, roughness: 0.3, clearcoat: 0.7, metalness: 0.1, emissive: new THREE.Color("#c48a00"), emissiveIntensity: 0.15 });
     const markGeo = new THREE.TorusGeometry(0.075, 0.018, 10, 24, Math.PI); this.disposables.push(markGeo);
     const marks: [number, number][] = [[-0.2, -0.5], [0, -0.48], [0.2, -0.5], [-0.1, -0.7], [0.1, -0.7]];
@@ -140,14 +145,14 @@ export class OwlRig {
       const m = new THREE.Mesh(markGeo, markMat);
       const nx = x / 0.74, ny = (y + 0.42) / (0.82 * 0.74); const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
       m.position.set(x, y, 0.36 + nz * 0.74 * 0.78 + 0.005); m.rotation.z = Math.PI; m.lookAt(m.position.clone().add(new THREE.Vector3(nx * 0.6, ny * 0.6, 1))); m.rotateZ(Math.PI);
-      this.root.add(m);
+      this.root.add(m); this.bellyParts.push(m);
     }
 
     // Cachecol turquesa com nó e pingente
     const scarfMat = this.mat({ color: C.scarf, roughness: 0.4, sheen: 0.25, sheenColor: new THREE.Color("#8ffff0"), clearcoat: 0.35 });
-    const scarf = this.mesh(new THREE.TorusGeometry(0.9, 0.085, 24, 96), scarfMat); scarf.rotation.x = Math.PI / 2; scarf.position.y = -0.2; scarf.scale.set(1.04, 1.0, 1); this.root.add(scarf);
-    const knot = this.mesh(new THREE.SphereGeometry(0.11, 24, 16), scarfMat); knot.position.set(0.42, -0.23, 0.86); this.root.add(knot);
-    const tassel = this.mesh(new THREE.ConeGeometry(0.08, 0.3, 20), this.mat({ color: C.scarfDark, roughness: 0.5 })); tassel.position.set(0.48, -0.44, 0.83); tassel.rotation.z = 0.12; this.root.add(tassel);
+    const scarf = this.mesh(new THREE.TorusGeometry(0.9, 0.085, 24, 96), scarfMat); scarf.rotation.x = Math.PI / 2; scarf.position.y = -0.2; scarf.scale.set(1.04, 1.0, 1); this.root.add(scarf); this.scarfParts.push(scarf);
+    const knot = this.mesh(new THREE.SphereGeometry(0.11, 24, 16), scarfMat); knot.position.set(0.42, -0.23, 0.86); this.root.add(knot); this.scarfParts.push(knot);
+    const tassel = this.mesh(new THREE.ConeGeometry(0.08, 0.3, 20), this.mat({ color: C.scarfDark, roughness: 0.5 })); tassel.position.set(0.48, -0.44, 0.83); tassel.rotation.z = 0.12; this.root.add(tassel); this.scarfParts.push(tassel);
 
     // Rosto (gira sobre o corpo para inclinar e virar a cabeça)
     this.root.add(this.face);
@@ -188,7 +193,7 @@ export class OwlRig {
       const tf = this.mesh(new THREE.ConeGeometry(0.17, 0.46, 24), featherMat); tf.position.set(side * 0.55, 0.86, 0.02); tf.rotation.z = -side * 0.42; this.face.add(tf); this.tufts.push(tf);
     }
     for (const [x, r] of [[-0.09, 0.45], [0.09, -0.45], [0, 0]] as const) {
-      const lf = this.mesh(new THREE.CapsuleGeometry(0.055, r === 0 ? 0.2 : 0.16, 8, 16), featherDark); lf.position.set(x, 1.03 + (r === 0 ? 0.04 : 0), 0.05); lf.rotation.z = r; this.face.add(lf);
+      const lf = this.mesh(new THREE.CapsuleGeometry(0.055, r === 0 ? 0.2 : 0.16, 8, 16), featherDark); lf.position.set(x, 1.03 + (r === 0 ? 0.04 : 0), 0.05); lf.rotation.z = r; this.face.add(lf); this.leaves.push(lf);
     }
 
     // Asinhas (articuladas no ombro)
@@ -221,14 +226,147 @@ export class OwlRig {
   setLook(x: number, y: number, active = true) { this.look = { x, y, active }; }
   setEntrance(v: number) { this.entrance = v; }
 
+  // ---------- Roupas temáticas ----------
+  private canvasTex(w: number, h: number, draw: (x: CanvasRenderingContext2D) => void) {
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h; draw(cv.getContext("2d")!);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; this.disposables.push(t); return t;
+  }
+
+  private dress(o: Outfit) {
+    this.outfit = o;
+    const band = (r: number, from: number, to: number, mat: THREE.Material) => {
+      const m = this.mesh(new THREE.SphereGeometry(r, 72, 40, 0, Math.PI * 2, from * Math.PI, (to - from) * Math.PI), mat);
+      m.scale.set(1, 0.98, 0.94); this.root.add(m); return m;
+    };
+    if (o === "selecao") {
+      // uniforme da seleção: camisa amarela, gola V e punhos verdes, calção azul, “BRASIL 10” nas costas (sem escudos ou marcas)
+      this.bellyParts.forEach((x) => (x.visible = false)); this.scarfParts.forEach((x) => (x.visible = false));
+      const yellow = this.mat({ color: "#ffd500", roughness: 0.5, sheen: 0.5, sheenColor: new THREE.Color("#fff3a0"), clearcoat: 0.15, emissive: new THREE.Color("#ffb800"), emissiveIntensity: 0.16 });
+      const green = this.mat({ color: "#009c3b", roughness: 0.45, clearcoat: 0.2 });
+      const blue = this.mat({ color: "#1f47c9", roughness: 0.5, sheen: 0.5, sheenColor: new THREE.Color("#8fa8ff"), emissive: new THREE.Color("#0b2a8a"), emissiveIntensity: 0.2 });
+      const white = this.mat({ color: "#ffffff", roughness: 0.5 });
+      band(1.014, 0.53, 0.74, yellow);
+      band(1.02, 0.74, 0.96, blue);
+      // gola redonda + “V” verde na frente
+      const collar = this.mesh(new THREE.TorusGeometry(0.99, 0.05, 16, 96), green); collar.rotation.x = Math.PI / 2; collar.position.y = -0.09; collar.scale.set(1, 0.94, 1); this.root.add(collar);
+      const vSeg = (from: THREE.Vector3, to: THREE.Vector3) => {
+        const len = from.distanceTo(to);
+        const m = this.mesh(new THREE.CapsuleGeometry(0.045, len, 6, 12), green);
+        m.position.copy(from).add(to).multiplyScalar(0.5);
+        m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
+        this.root.add(m);
+      };
+      vSeg(new THREE.Vector3(-0.26, -0.1, 0.9), new THREE.Vector3(0, -0.36, 0.905));
+      vSeg(new THREE.Vector3(0.26, -0.1, 0.9), new THREE.Vector3(0, -0.36, 0.905));
+      // barra verde e faixa branca lateral no calção
+      const hem = this.mesh(new THREE.TorusGeometry(0.735, 0.04, 12, 80), green); hem.rotation.x = Math.PI / 2; hem.position.y = -0.665; hem.scale.set(1.0, 0.94, 1); this.root.add(hem);
+      for (const side of [-1, 1]) { const st = this.mesh(new THREE.CapsuleGeometry(0.03, 0.12, 4, 8), white); st.position.set(side * 0.66, -0.78, 0.18); st.rotation.z = side * 0.75; this.root.add(st); }
+      // mangas amarelas com punho verde nas asinhas
+      for (const w of this.wings) {
+        const sleeve = this.mesh(new THREE.CapsuleGeometry(0.175, 0.14, 8, 16), yellow); sleeve.position.set(w.side * 0.06, -0.13, 0); sleeve.scale.set(0.95, 1, 0.65); w.pivot.add(sleeve);
+        const cuff = this.mesh(new THREE.TorusGeometry(0.158, 0.035, 10, 32), green); cuff.rotation.x = Math.PI / 2; cuff.position.set(w.side * 0.07, -0.27, 0); cuff.scale.set(1, 0.65, 1); w.pivot.add(cuff);
+      }
+      // número na frente (pequeno) e BRASIL 10 nas costas
+      const num = this.canvasTex(512, 512, (x) => {
+        x.fillStyle = "#009c3b"; x.textAlign = "center"; x.textBaseline = "middle";
+        x.font = "bold 92px sans-serif"; x.fillText("BRASIL", 256, 120);
+        x.font = "bold 280px sans-serif"; x.fillText("10", 256, 330);
+      });
+      const numMat = new THREE.MeshBasicMaterial({ map: num, transparent: true }); this.disposables.push(numMat);
+      const back = this.mesh(new THREE.PlaneGeometry(0.78, 0.78), numMat); back.position.set(0, -0.36, -0.975); back.rotation.y = Math.PI; this.root.add(back);
+      const small = this.canvasTex(128, 128, (x) => { x.fillStyle = "#009c3b"; x.font = "bold 84px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("10", 64, 70); });
+      const smallMat = new THREE.MeshBasicMaterial({ map: small, transparent: true }); this.disposables.push(smallMat);
+      const front = this.mesh(new THREE.PlaneGeometry(0.2, 0.2), smallMat); front.position.set(0.42, -0.3, 0.83); front.rotation.y = 0.45; this.root.add(front);
+      // bola de futebol
+      const tex = this.canvasTex(512, 256, (x) => {
+        x.fillStyle = "#fbfbfb"; x.fillRect(0, 0, 512, 256); x.fillStyle = "#1b1b22";
+        const pent = (cx: number, cy: number, r: number) => { x.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5; x.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a)); } x.closePath(); x.fill(); };
+        for (const [cx, cy] of [[64, 64], [192, 64], [320, 64], [448, 64], [0, 192], [128, 192], [256, 192], [384, 192], [512, 192]]) pent(cx, cy, 30);
+        x.fillRect(0, 0, 512, 10); x.fillRect(0, 246, 512, 10);
+      });
+      this.ball = this.mesh(new THREE.SphereGeometry(0.26, 40, 24), this.mat({ map: tex, roughness: 0.4, clearcoat: 0.5 }));
+      this.scene.add(this.ball);
+    }
+    if (o === "beachtennis") {
+      // viseira e raquete de beach tennis com bolinha
+      const coral = this.mat({ color: "#ff6b5b", roughness: 0.45 });
+      const white = this.mat({ color: "#ffffff", roughness: 0.4 });
+      const strap = this.mesh(new THREE.TorusGeometry(0.635, 0.05, 14, 80), white); strap.rotation.x = Math.PI / 2 + 0.12; strap.position.set(0, 0.775, -0.02); strap.scale.set(1, 0.95, 1); this.face.add(strap);
+      const brim = this.mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.05, 48, 1, false, -1.15, 2.3), coral);
+      brim.position.set(0, 0.8, 0.4); brim.rotation.x = 0.42; brim.scale.set(1.1, 1, 1.05); this.face.add(brim);
+      const holes = this.canvasTex(256, 256, (x) => {
+        const g = x.createLinearGradient(0, 0, 256, 256); g.addColorStop(0, "#14c3b0"); g.addColorStop(1, "#0b8f87"); x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+        x.fillStyle = "rgba(255,255,255,.55)"; for (let i = 0; i < 9; i++) for (let j = 0; j < 9; j++) if ((i - 4) ** 2 + (j - 4) ** 2 < 17) { x.beginPath(); x.arc(28 + i * 25, 28 + j * 25, 5, 0, Math.PI * 2); x.fill(); }
+        x.fillStyle = "#ffd21f"; x.fillRect(0, 118, 256, 20);
+      });
+      this.paddle = new THREE.Group();
+      const face = this.mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.05, 48), this.mat({ map: holes, roughness: 0.35, clearcoat: 0.6 }));
+      face.rotation.x = Math.PI / 2; face.scale.set(1, 1, 1.12); face.position.y = 0.42; this.paddle.add(face);
+      const grip = this.mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.36, 20), this.mat({ color: "#1b2150", roughness: 0.6 })); grip.position.y = 0.0; this.paddle.add(grip);
+      this.paddle.position.set(0.1, -0.55, 0.22); this.paddle.rotation.z = -0.35; this.paddle.scale.setScalar(0.9);
+      const right = this.wings.find((w) => w.side === 1); right?.pivot.add(this.paddle);
+      this.ball = this.mesh(new THREE.SphereGeometry(0.085, 24, 16), this.mat({ color: "#d7f23a", roughness: 0.6, sheen: 1, sheenColor: new THREE.Color("#f6ffb0") }));
+      this.scene.add(this.ball);
+    }
+    if (o === "nadadora") {
+      // touca, óculos e boia
+      this.tufts.forEach((x) => (x.visible = false)); this.leaves.forEach((x) => (x.visible = false)); this.scarfParts.forEach((x) => (x.visible = false));
+      const capMat = this.mat({ color: "#ff5f8f", roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.15 });
+      const cap = this.mesh(new THREE.SphereGeometry(1.03, 64, 32, 0, Math.PI * 2, 0, Math.PI * 0.3), capMat); cap.scale.set(1, 0.98, 0.94); this.face.add(cap);
+      const dot = this.mesh(new THREE.SphereGeometry(0.09, 16, 12), this.mat({ color: "#ffffff", roughness: 0.3 })); dot.position.set(0.3, 0.92, 0.36); dot.scale.set(1, 0.6, 1); this.face.add(dot);
+      const frame = this.mat({ color: "#1fb3d1", roughness: 0.3, clearcoat: 1 });
+      const lens = this.mat({ color: "#9fe8ff", roughness: 0.05, transmission: 0.6, transparent: true, opacity: 0.75, clearcoat: 1 });
+      for (const side of [-1, 1]) {
+        const g = this.mesh(new THREE.TorusGeometry(0.15, 0.04, 12, 32), frame); g.position.set(side * 0.27, 0.7, 0.71); g.rotation.x = -0.75; g.rotation.y = side * 0.3; this.face.add(g);
+        const l = this.mesh(new THREE.CircleGeometry(0.14, 32), lens); l.position.copy(g.position); l.rotation.copy(g.rotation); l.translateZ(0.01); this.face.add(l);
+      }
+      const strap = this.mesh(new THREE.TorusGeometry(0.775, 0.035, 10, 80), frame); strap.rotation.x = Math.PI / 2 + 0.12; strap.position.set(0, 0.665, -0.02); strap.scale.set(1, 0.96, 1); this.face.add(strap);
+      const stripes = this.canvasTex(512, 64, (x) => { for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? "#ffffff" : "#ff4d6d"; x.fillRect(i * 64, 0, 64, 64); } });
+      stripes.wrapS = THREE.RepeatWrapping;
+      this.ring = this.mesh(new THREE.TorusGeometry(1.0, 0.2, 24, 80), this.mat({ map: stripes, roughness: 0.3, clearcoat: 0.8 }));
+      this.ring.rotation.x = Math.PI / 2; this.ring.position.y = -0.38; this.ring.scale.set(1.04, 1, 0.9); this.root.add(this.ring);
+    }
+  }
+
+  private animateOutfit() {
+    const t = this.t;
+    if (this.outfit === "selecao" && this.ball) {
+      // embaixadinha de cabeça: a bola sobe e desce; a cabeça empurra no contato
+      const period = 0.95, f = (t % period) / period;
+      const h = 4 * f * (1 - f);
+      this.ball.position.set(Math.sin(t * 0.7) * 0.05, 1.32 + h * 0.62, 0.1);
+      this.ball.rotation.x += 0.06; this.ball.rotation.z += 0.02;
+      const hit = Math.max(0, 1 - Math.min(f, 1 - f) * 7);
+      this.face.rotation.x -= hit * 0.12;
+      this.root.position.y += hit * 0.05;
+    }
+    if (this.outfit === "beachtennis" && this.ball && this.paddle) {
+      const period = 1.1, f = (t % period) / period, h = 4 * f * (1 - f);
+      const p = new THREE.Vector3(); this.paddle.children[0].getWorldPosition(p);
+      this.ball.position.set(p.x, p.y + 0.12 + h * 0.6, p.z + 0.08);
+      const hit = Math.max(0, 1 - Math.min(f, 1 - f) * 8);
+      const right = this.wings.find((w) => w.side === 1);
+      if (right) right.pivot.rotation.z = 0.8 + hit * 0.18 + Math.sin(t * 2) * 0.03;
+    }
+    if (this.outfit === "nadadora" && this.ring) {
+      // flutuando: balança suave, asinhas “nadando”
+      this.root.position.y += Math.sin(t * 1.6) * 0.04;
+      this.root.rotation.z += Math.sin(t * 1.1) * 0.03;
+      for (const w of this.wings) w.pivot.rotation.z = w.side * (0.55 + Math.sin(t * 3 + (w.side === 1 ? 0 : Math.PI)) * 0.35);
+      this.ring.rotation.z = Math.sin(t * 0.8) * 0.05;
+    }
+  }
+
   resize(w: number, h: number) {
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     // Enquadramento: a coruja cabe inteira em qualquer proporção
-    const fitH = 3.0, fitW = 3.2;
+    const tall = this.outfit === "selecao";
+    const fitH = tall ? 3.75 : 3.0, fitW = this.outfit === "beachtennis" ? 3.9 : 3.2;
     const dist = Math.max(fitH / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))), fitW / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.aspect));
-    this.camera.position.set(0, 0.12, dist); this.camera.lookAt(0, -0.02, 0);
+    const cy = tall ? 0.38 : this.outfit === "beachtennis" ? 0.08 : -0.02;
+    this.camera.position.set(0, cy + 0.14, dist); this.camera.lookAt(0, cy, 0);
     this.camera.updateProjectionMatrix();
   }
 
@@ -299,6 +437,7 @@ export class OwlRig {
       w.pivot.rotation.z = w.side * (raise + flap + sway);
       w.pivot.rotation.x = -raise * 0.12;
     }
+    this.animateOutfit();
     const sh = 1 - Math.min(0.25, this.root.position.y * 0.6);
     this.shadow.scale.set(sh * Math.max(0.01, ent), 1, sh * Math.max(0.01, ent));
   }

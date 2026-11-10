@@ -1,18 +1,25 @@
 "use client";
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CondominioOwl, type CondominioOwlHandle, type OwlState } from "@/components/CondominioOwl";
 
 type Fala = { id: string; texto: string; estado: OwlState; pausaDepois: number };
-type Phase = "carregando" | "tocar" | "falando" | "fim";
+type Phase = "escolha" | "carregando" | "tocar" | "falando" | "fim";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const readTime = (t: string) => Math.max(2.2, t.split(/\s+/).length * 0.36);
 
-export function Welcome({ firstName, falas }: { firstName: string; falas: Fala[] }) {
+/** Marca a intro como vista neste aparelho (sessão) ou desativada (1 ano). */
+function markIntro(persist: boolean) {
+  document.cookie = `newin_intro=${persist ? "off" : "visto"}; path=/; samesite=lax${persist ? "; max-age=31536000" : ""}`;
+}
+
+export function Welcome({ firstName, falas, mode = "app", nextHref }: { firstName?: string; falas: Fala[]; mode?: "app" | "intro"; nextHref?: string }) {
+  const intro = mode === "intro";
+  const next = nextHref ?? (intro ? "/entrar" : "/");
+  const leave = (persist: boolean) => { if (intro) markIntro(persist); owl.current?.stop(); window.location.href = next; };
   const owl = useRef<CondominioOwlHandle>(null);
   const run = useRef(0);
-  const [phase, setPhase] = useState<Phase>("carregando");
+  const [phase, setPhase] = useState<Phase>(mode === "intro" ? "escolha" : "carregando");
   const [idx, setIdx] = useState(0);
   const [progress, setProgress] = useState(0);
   const [voz, setVoz] = useState(true);
@@ -90,10 +97,10 @@ export function Welcome({ firstName, falas }: { firstName: string; falas: Fala[]
 
   // tenta começar sozinho; se o navegador bloquear o som, pede um toque
   useEffect(() => {
-    if (vozDisponivel === null || phase !== "carregando") return;
+    if (intro || vozDisponivel === null || phase !== "carregando") return;
     const t = setTimeout(() => { void play(0); }, 900);
     return () => clearTimeout(t);
-  }, [vozDisponivel, phase, play]);
+  }, [intro, vozDisponivel, phase, play]);
 
   const toggleVoz = () => {
     const next = !voz; setVoz(next);
@@ -104,7 +111,7 @@ export function Welcome({ firstName, falas }: { firstName: string; falas: Fala[]
   const fala = falas[idx];
   const words = fala.texto.split(/(\s+)/);
   const wordCount = words.filter((w) => w.trim()).length;
-  const shown = phase === "fim" ? wordCount : Math.ceil(progress * wordCount * 1.04);
+  const shown = phase === "fim" || phase === "escolha" ? wordCount : Math.ceil(progress * wordCount * 1.04);
 
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[radial-gradient(120%_80%_at_50%_0%,#efeaff_0%,#f8f6ff_45%,#ffffff_100%)]">
@@ -117,7 +124,7 @@ export function Welcome({ firstName, falas }: { firstName: string; falas: Fala[]
             <p className="text-lg font-bold tracking-[-0.02em] text-violeta">NEW.IN</p>
             <p className="-mt-0.5 text-xs text-noite-50">Comunidade</p>
           </div>
-          <Link href="/" className="text-sm font-medium text-noite-50 hover:text-violeta">Pular</Link>
+          <button type="button" onClick={() => leave(false)} className="text-sm font-medium text-noite-50 hover:text-violeta">Pular</button>
         </header>
 
         <div className="flex flex-1 flex-col items-center justify-center gap-4 md:grid md:grid-cols-[1.05fr_1fr] md:gap-10">
@@ -126,7 +133,7 @@ export function Welcome({ firstName, falas }: { firstName: string; falas: Fala[]
           </div>
 
           <div className="w-full max-w-md md:justify-self-start">
-            <p className="mb-3 text-sm font-medium text-violeta">Olá, {firstName}!</p>
+            <p className="mb-3 text-sm font-medium text-violeta">{firstName ? `Olá, ${firstName}!` : "Bem-vindo ao NEW.IN!"}</p>
             <div className="relative rounded-[28px] bg-white px-5 py-5 shadow-[0_18px_50px_-20px_rgba(76,45,200,0.35)] ring-1 ring-linha sm:p-7">
               <span aria-hidden className="absolute -top-2 left-10 h-5 w-5 rotate-45 rounded-[4px] bg-white ring-1 ring-linha [clip-path:polygon(0_0,100%_0,0_100%)] md:-left-2 md:top-10" />
               <p className="min-h-[5.2rem] text-[1.08rem] font-medium leading-relaxed text-noite sm:text-[1.3rem]" aria-live="polite">
@@ -141,6 +148,17 @@ export function Welcome({ firstName, falas }: { firstName: string; falas: Fala[]
               </div>
             </div>
 
+            {phase === "escolha" ? (
+              <div className="mt-5 space-y-3">
+                <button type="button" onClick={() => void play(0)} className="btn-primary w-full justify-center text-base">
+                  <span aria-hidden>▶</span> Ouvir a Corujinha
+                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button type="button" onClick={() => leave(false)} className="btn-secondary justify-center">Pular</button>
+                  <button type="button" onClick={() => leave(true)} className="btn-ghost justify-center text-noite-50">Não mostrar mais</button>
+                </div>
+              </div>
+            ) : (<>
             <div className="mt-4 flex flex-wrap items-center gap-2.5">
               <div className="flex h-10 items-end gap-[3px] rounded-full bg-white px-3 py-2.5 ring-1 ring-linha" aria-label={voz ? "Narração" : "Narração desligada"}>
                 {[0.55, 0.85, 1, 0.75, 0.5].map((k, i) => (
@@ -154,7 +172,9 @@ export function Welcome({ firstName, falas }: { firstName: string; falas: Fala[]
             </div>
             {vozDisponivel === false && <p className="mt-3 text-sm text-noite-50">A voz da Corujinha está indisponível agora; acompanhe pelo texto.</p>}
 
-            <Link href="/" className={`btn-primary mt-6 w-full justify-center ${phase === "fim" ? "animate-[pulse_1.6s_ease-in-out_2]" : ""}`}>Continuar para o app</Link>
+            <button type="button" onClick={() => leave(false)} className={`btn-primary mt-6 w-full justify-center ${phase === "fim" ? "animate-[pulse_1.6s_ease-in-out_2]" : ""}`}>{intro ? "Entrar no app" : "Continuar para o app"}</button>
+            {intro && <button type="button" onClick={() => leave(true)} className="mt-3 w-full text-center text-sm text-noite-50 hover:text-violeta">Não mostrar mais esta apresentação</button>}
+            </>)}
           </div>
         </div>
       </div>

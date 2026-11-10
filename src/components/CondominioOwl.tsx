@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { levelAt, mouthAt } from "./owl3d/lipsync";
-import type { OwlExpression, OwlRig, OwlState } from "./owl3d/OwlRig";
+import type { Outfit, OwlExpression, OwlRig, OwlState } from "./owl3d/OwlRig";
 import { falaUrl, loadSpeech, SpeechPlayer, type Loaded, type PlayResult } from "./owl3d/speech";
 
 export type { OwlExpression, OwlState };
@@ -47,6 +47,8 @@ export type CondominioOwlProps = {
   mostrarTexto?: boolean;
   entrada?: boolean;
   qualidade?: "alta" | "leve";
+  /** roupa temática (quadras e piscina) */
+  outfit?: Outfit;
   className?: string;
   ariaLabel?: string;
   onFim?: (r: PlayResult) => void;
@@ -60,7 +62,7 @@ function requestFor(input: SpeakInput): [string, RequestInit | undefined] | null
 }
 
 export const CondominioOwl = forwardRef<CondominioOwlHandle, CondominioOwlProps>(function CondominioOwl(props, ref) {
-  const { texto, estado = "idle", expressao = "neutral", falaId, audio, velocidade = 1, volume = 0.9, vozAtiva = true, autoPlay = false, repetir = 0, mostrarTexto = false, entrada = true, qualidade, className = "", ariaLabel, onFim } = props;
+  const { texto, estado = "idle", expressao = "neutral", falaId, audio, velocidade = 1, volume = 0.9, vozAtiva = true, autoPlay = false, repetir = 0, mostrarTexto = false, entrada = true, qualidade, outfit, className = "", ariaLabel, onFim } = props;
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const rig = useRef<OwlRig | null>(null);
@@ -83,7 +85,7 @@ export const CondominioOwl = forwardRef<CondominioOwlHandle, CondominioOwlProps>
       let r: OwlRig;
       try {
         const low = (navigator.hardwareConcurrency ?? 8) <= 4 || /Android [4-8]\b/.test(navigator.userAgent);
-        r = new mod.OwlRig(canvas.current, { quality: qualidade ?? (low ? "leve" : "alta") });
+        r = new mod.OwlRig(canvas.current, { quality: qualidade ?? (low ? "leve" : "alta"), outfit });
       } catch { setFallback(true); return; }
       rig.current = r;
       r.setState(base.current.estado); r.setExpression(base.current.expressao);
@@ -112,7 +114,7 @@ export const CondominioOwl = forwardRef<CondominioOwlHandle, CondominioOwlProps>
       document.removeEventListener("visibilitychange", onVis);
       rig.current?.dispose(); rig.current = null;
     };
-  }, [entrada, qualidade]);
+  }, [entrada, qualidade, outfit]);
 
   useEffect(() => { player.current = new SpeechPlayer(); return () => { player.current?.dispose(); player.current = null; }; }, []);
   useEffect(() => { if (!speakingState.current) rig.current?.setState(estado); }, [estado]);
@@ -159,7 +161,7 @@ export const CondominioOwl = forwardRef<CondominioOwlHandle, CondominioOwlProps>
   return (
     <div ref={wrap} className={`relative ${className}`} role="img" aria-label={ariaLabel ?? "Corujinha do NEW.IN"}>
       {fallback ? (
-        <img src="/corujinha/ola.webp" alt="" className="owl-bob absolute inset-0 m-auto h-full w-full object-contain" draggable={false} />
+        <img src={`/corujinha/${outfit ? "festa" : "ola"}.webp`} alt="" className="owl-bob absolute inset-0 m-auto h-full w-full object-contain" draggable={false} />
       ) : (
         <canvas ref={canvas} className={`absolute inset-0 h-full w-full transition-opacity duration-500 ${ready ? "opacity-100" : "opacity-0"}`} />
       )}

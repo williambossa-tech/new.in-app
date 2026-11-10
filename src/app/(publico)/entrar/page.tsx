@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/app/actions/auth";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -11,6 +12,7 @@ export default async function Entrar({ searchParams }: { searchParams: Promise<{
   const me = await getSessionUser();
   if (me) redirect(me.status === "ativo" ? "/" : "/aguardando");
   const { next } = await searchParams;
+  if (!(await cookies()).get("newin_intro")) redirect(next && next !== "/" ? `/intro?next=${encodeURIComponent(next)}` : "/intro");
   const demo = (await currentEnv()) === "demonstracao";
   return (
     <>
